@@ -145,7 +145,7 @@ public class EditorUtils {
     newMesh.triangles = Triangles;
     newMesh.uv = OriginalMesh.uv;
     newMesh.uv2 = OriginalMesh.uv2;
-    newMesh.uv2 = OriginalMesh.uv2;
+    newMesh.uv3 = OriginalMesh.uv3;
     newMesh.colors = OriginalMesh.colors;
     newMesh.subMeshCount = OriginalMesh.subMeshCount;
     newMesh.normals = OriginalMesh.normals;
