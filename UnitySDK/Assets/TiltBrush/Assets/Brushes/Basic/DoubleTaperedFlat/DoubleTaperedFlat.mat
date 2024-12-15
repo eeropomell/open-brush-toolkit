@@ -4,11 +4,12 @@
 Material:
   serializedVersion: 6
   m_ObjectHideFlags: 0
-  m_PrefabParentObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
   m_Name: DoubleTaperedFlat
   m_Shader: {fileID: 4800000, guid: 4496a9baf3f2fc446bbaff38336003df, type: 3}
-  m_ShaderKeywords: 
+  m_ShaderKeywords: SELECTION_EDGING
   m_LightmapFlags: 5
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -36,6 +37,7 @@ Material:
     - _Scroll1: 20
     - _Scroll2: 50
     - _Scroll3: 0.05
+    - _SelectionEdging: 1
     - _UVTile1: 1
     - _UVTile2: 1
     - _UVTile3: 1

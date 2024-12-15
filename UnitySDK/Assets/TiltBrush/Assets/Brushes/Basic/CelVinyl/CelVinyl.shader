@@ -12,11 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 Shader "Brush/Special/CelVinyl" {
   Properties{
     _MainTex("MainTex", 2D) = "white" {}
     _Color("Color", Color) = (1,1,1,1)
     _Cutoff ("Alpha Cutoff", Range (0,1)) = 0.5
+
+    _Dissolve ("Dissolve", Range(0, 1)) = 1
+  	_ClipStart("Clip Start", Float) = 0
+	  _ClipEnd("Clip End", Float) = -1
   }
 
   SubShader{
@@ -31,8 +49,10 @@ Shader "Brush/Special/CelVinyl" {
         #pragma fragment frag
         #pragma multi_compile __ TBT_LINEAR_TARGET
         #pragma multi_compile_fog
+        #pragma multi_compile __ SELECTION_ON
         #include "../../../Shaders/Include/Brush.cginc"
         #include "UnityCG.cginc"
+        #include "../../../Shaders/Include/MobileSelection.cginc"
         #pragma target 3.0
 
         sampler2D _MainTex;
@@ -40,17 +60,27 @@ Shader "Brush/Special/CelVinyl" {
         fixed4 _Color;
         float _Cutoff;
 
+        uniform half _ClipStart;
+        uniform half _ClipEnd;
+        uniform half _Dissolve;
+
         struct appdata_t {
             float4 vertex : POSITION;
             float2 texcoord : TEXCOORD0;
             float4 color : COLOR;
+            uint id : SV_VertexID;
+
+            UNITY_VERTEX_INPUT_INSTANCE_ID
         };
 
         struct v2f {
-            float4 vertex : SV_POSITION;
+            float4 pos : POSITION;
             float2 texcoord : TEXCOORD0;
             float4 color : COLOR;
+            uint id : TEXCOORD2;
             UNITY_FOG_COORDS(1)
+
+            UNITY_VERTEX_OUTPUT_STEREO
         };
 
         v2f vert (appdata_t v)
@@ -58,15 +88,25 @@ Shader "Brush/Special/CelVinyl" {
 
           v2f o;
 
-          o.vertex = UnityObjectToClipPos(v.vertex);
+          UNITY_SETUP_INSTANCE_ID(v);
+          UNITY_INITIALIZE_OUTPUT(v2f, o);
+          UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
+          o.pos = UnityObjectToClipPos(v.vertex);
           o.texcoord = v.texcoord;
           o.color = TbVertToNative(v.color);
-          UNITY_TRANSFER_FOG(o, o.vertex);
+          o.id = (float2)v.id;
+          UNITY_TRANSFER_FOG(o, o.pos);
           return o;
         }
 
-        fixed4 frag (v2f i) : SV_Target
+        fixed4 frag (v2f i) : COLOR
         {
+          #ifdef SHADER_SCRIPTING_ON
+          if (_ClipEnd > 0 && !(i.id.x > _ClipStart && i.id.x < _ClipEnd)) discard;
+          if (_Dissolve < 1 && Dither8x8(i.pos.xy) >= _Dissolve) discard;
+          #endif
+
           fixed4 tex = tex2D(_MainTex, i.texcoord) * i.color;
           UNITY_APPLY_FOG(i.fogCoord, tex);
 
@@ -74,6 +114,8 @@ Shader "Brush/Special/CelVinyl" {
           if (tex.a < _Cutoff) {
             discard;
           }
+          tex.a = 1;
+         // FRAG_MOBILESELECT(tex)
           return tex;
         }
 

@@ -12,10 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // -*- c -*-
 
 // Canvas transform.
+#pragma multi_compile __ SHADER_SCRIPTING_ON
+
+#include "TimeOverride.cginc"
+
 uniform float4x4 xf_CS;
 // Inverse canvas transform.
 uniform float4x4 xf_I_CS;
@@ -40,7 +57,6 @@ float4 bloomColor(float4 color, float gain) {
 float4 GetAnimatedSelectionColor( float4 color) {
   return color + sin(_Time.w*2)*.1 + .2f;
 }
-
 
 //
 // Common for Music Reactive Brushes
@@ -76,7 +92,7 @@ float4 musicReactiveColor(float4 color, float beat) {
 
 float4 musicReactiveAnimationWorldSpace(float4 worldPos, float4 color, float beat, float t) {
   float intensity = .15;
-  float randomOffset = 2 * 3.14159 * randomizeByColor(color) + _Time.w + worldPos.z;
+  float randomOffset = 2 * 3.14159 * randomizeByColor(color) + GetTime().w + worldPos.z;
   // the first sin function makes the start and end points of the UV's (0:1) have zero modulation.
   // The second sin term causes vibration along the stroke like a plucked guitar string - frequency defined by color
   worldPos.xyz += randomNormal(color.rgb) * beat * sin(t * 3.14159) * sin(randomOffset) * intensity;
@@ -149,4 +165,27 @@ float4 NativeToSrgb(float4 color) { return color; }
 
 // TBT is in meters, TB is in decimeters.
 #define kDecimetersToWorldUnits 0.1
+
+float Dither8x8(float2 position)
+{
+  const float DitherSize = 8.0;
+  float2 ditherPosition = position % DitherSize;
+  int x = int(ditherPosition.x);
+  int y = int(ditherPosition.y);
+
+  const float dither8x8[8*8] =
+  {
+    0,32, 8,40, 2,34,10,42,
+    48,16,56,24,50,18,58,26,
+    12,44, 4,36,14,46, 6,38,
+    60,28,52,20,62,30,54,22,
+    3,35,11,43, 1,33, 9,41,
+    51,19,59,27,49,17,57,25,
+    15,47, 7,39,13,45, 5,37,
+    63,31,55,23,61,29,53,21
+};
+
+  float value = dither8x8[y * 8 + x] / 64.0;
+  return value;
+}
 

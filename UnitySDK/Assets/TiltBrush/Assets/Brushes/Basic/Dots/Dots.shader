@@ -12,6 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 Shader "Brush/Visualizer/Dots" {
 Properties {
   _TintColor ("Tint Color", Color) = (0.5,0.5,0.5,0.5)
@@ -20,6 +34,10 @@ Properties {
   _WaveformIntensity("Waveform Intensity", Vector) = (0,1,0,0)
   _BaseGain("Base Gain", Float) = 0
   _EmissionGain("Emission Gain", Float) = 0
+
+  _Dissolve("_Dissolve", Range(0, 1)) = 1
+  _ClipStart("Clip Start", Float) = 0
+  _ClipEnd("Clip End", Float) = -1
 }
 
 Category {
@@ -40,19 +58,28 @@ Category {
       #pragma glsl
       #pragma multi_compile __ AUDIO_REACTIVE
       #pragma multi_compile __ TBT_LINEAR_TARGET
+      #pragma multi_compile __ SELECTION_ON
       #include "UnityCG.cginc"
       #include "../../../Shaders/Include/Brush.cginc"
       #include "../../../Shaders/Include/Particles.cginc"
       #include "Assets/ThirdParty/Noise/Shaders/Noise.cginc"
+      #include "../../../Shaders/Include/MobileSelection.cginc"
 
       sampler2D _MainTex;
       fixed4 _TintColor;
+
+      uniform half _ClipStart;
+      uniform half _ClipEnd;
+      uniform half _Dissolve;
 
       struct v2f {
         float4 vertex : SV_POSITION;
         fixed4 color : COLOR;
         float2 texcoord : TEXCOORD0;
         float waveform : TEXCOORD1;
+        uint id : TEXCOORD2;
+
+        UNITY_VERTEX_OUTPUT_STEREO
       };
 
       float4 _MainTex_ST;
@@ -65,6 +92,11 @@ Category {
       {
         v.color = TbVertToSrgb(v.color);
         v2f o;
+
+        UNITY_SETUP_INSTANCE_ID(v);
+        UNITY_INITIALIZE_OUTPUT(v2f, o);
+        UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
         float birthTime = v.texcoord.w;
         float rotation = v.texcoord.z;
         float halfSize = GetParticleHalfSize(v.corner.xyz, v.center, birthTime);
@@ -75,7 +107,7 @@ Category {
 #ifdef AUDIO_REACTIVE
         float4 dispVec = float4(0,0,0,0);
         float4 corner_WS = mul(unity_ObjectToWorld, corner);
-        // TODO(pld): worldspace is almost certainly incorrect: use scene or object?
+        // TODO: worldspace is almost certainly incorrect: use scene or object?
         waveform = tex2Dlod(_FFTTex, float4(fmod(corner_WS.x * _WaveformFreq + _BeatOutputAccum.z*.5,1),0,0,0) ).b * .25;
         dispVec.xyz += waveform * _WaveformIntensity.xyz;
         corner = corner + dispVec;
@@ -84,13 +116,20 @@ Category {
         o.color = v.color * _BaseGain;
         o.texcoord = TRANSFORM_TEX(v.texcoord.xy,_MainTex);
         o.waveform = waveform * 15;
+        o.id = v.id;
         return o;
       }
 
       // Input color is srgb
       fixed4 frag (v2f i) : SV_Target
       {
-#ifdef AUDIO_REACTIVE
+        #ifdef SHADER_SCRIPTING_ON
+        if (_ClipEnd > 0 && !(i.id.x > _ClipStart && i.id.x < _ClipEnd)) discard;
+        // It's hard to get alpha curves right so use dithering for hdr shaders
+        if (_Dissolve < 1 && Dither8x8(i.vertex.xy) >= _Dissolve) discard;
+        #endif
+
+        #ifdef AUDIO_REACTIVE
         // Deform uv's by waveform displacement amount vertically
         // Envelop by "V" UV to keep the edges clean
         float vDistance = abs(i.texcoord.y - .5)*2;
@@ -104,7 +143,11 @@ Category {
         c.rgb += c.rgb * c.a * _EmissionGain;
         c.a = 1;
         c = SrgbToNative(c);
-        return float4(c.rgb, 1.0);
+        c = float4(c.rgb, 1.0);
+#if SELECTION_ON
+        c.rgb = GetSelectionColor() * tex.r;
+#endif
+          return c * _Dissolve;
       }
       ENDCG
     }

@@ -12,13 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 Shader "Brush/Special/Fire" {
 Properties {
   _MainTex ("Particle Texture", 2D) = "white" {}
   _Scroll1 ("Scroll1", Float) = 0
   _Scroll2 ("Scroll2", Float) = 0
   _DisplacementIntensity("Displacement", Float) = .1
-    _EmissionGain ("Emission Gain", Range(0, 1)) = 0.5
+  _EmissionGain ("Emission Gain", Range(0, 1)) = 0.5
+
+
+  _TimeOverrideValue("Time Override Value", Vector) = (0,0,0,0)
+  _TimeBlend("Time Blend", Float) = 0
+  _TimeSpeed("Time Speed", Float) = 1.0
+
+    _Dissolve("Dissolve", Range(0, 1)) = 1
+	_ClipStart("Clip Start", Float) = 0
+	_ClipEnd("Clip End", Float) = -1
 }
 
 Category {
@@ -34,13 +57,14 @@ Category {
       CGPROGRAM
       #pragma vertex vert
       #pragma fragment frag
-      #pragma target 3.0
+      #pragma target 4.0
       #pragma multi_compile_particles
       #pragma multi_compile __ AUDIO_REACTIVE
       #pragma multi_compile __ TBT_LINEAR_TARGET
-
+      #pragma multi_compile __ SELECTION_ON
       #include "UnityCG.cginc"
       #include "../../../Shaders/Include/Brush.cginc"
+      #include "../../../Shaders/Include/MobileSelection.cginc"
 
       sampler2D _MainTex;
 
@@ -54,10 +78,13 @@ Category {
         float2 texcoord : TEXCOORD0;
 #endif
         float3 worldPos : TEXCOORD1;
+        uint id : SV_VertexID;
+
+        UNITY_VERTEX_INPUT_INSTANCE_ID
       };
 
       struct v2f {
-        float4 vertex : POSITION;
+        float4 pos : POSITION;
         float4 color : COLOR;
 #if SHADER_TARGET >= 40
         centroid float2 texcoord : TEXCOORD0;
@@ -65,6 +92,9 @@ Category {
         float2 texcoord : TEXCOORD0;
 #endif
         float3 worldPos : TEXCOORD1;
+        uint id : TEXCOORD2;
+
+        UNITY_VERTEX_OUTPUT_STEREO
       };
 
       float4 _MainTex_ST;
@@ -73,20 +103,37 @@ Category {
       half _DisplacementIntensity;
       half _EmissionGain;
 
+      uniform half _ClipStart;
+      uniform half _ClipEnd;
+      uniform half _Dissolve;
+
       v2f vert (appdata_t v)
       {
         v.color = TbVertToSrgb(v.color);
         v2f o;
+
+        UNITY_SETUP_INSTANCE_ID(v);
+        UNITY_INITIALIZE_OUTPUT(v2f, o);
+        UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
         o.texcoord = TRANSFORM_TEX(v.texcoord,_MainTex);
         o.color = bloomColor(v.color, _EmissionGain);
-        o.vertex = UnityObjectToClipPos(v.vertex);
+        o.pos = UnityObjectToClipPos(v.vertex);
         o.worldPos = mul(unity_ObjectToWorld, v.vertex);
+        o.id = (float2)v.id;
         return o;
       }
 
       // Note: input color is srgb
       fixed4 frag (v2f i) : COLOR
       {
+
+        #ifdef SHADER_SCRIPTING_ON
+        if (_ClipEnd > 0 && !(i.id.x > _ClipStart && i.id.x < _ClipEnd)) discard;
+        // It's hard to get alpha curves right so use dithering for hdr shaders
+        if (_Dissolve < 1 && Dither8x8(i.pos.xy) >= _Dissolve) discard;
+        #endif
+
         half2 displacement;
         float procedural_line = 0;
 #ifdef AUDIO_REACTIVE
@@ -95,7 +142,7 @@ Category {
         float envelopeHalf = sin(i.texcoord.x * 3.14159 * .5);
 
         // Basic fire effect
-        displacement = tex2D(_MainTex, i.texcoord + half2(-_Time.x * _Scroll1, 0)  ).a;
+        displacement = tex2D(_MainTex, i.texcoord + half2(-GetTime().x * _Scroll1, 0)  ).a;
 
         // Waveform fire effect
         float waveform = (tex2D(_WaveFormTex, float2(i.texcoord.x * .2 + .025*i.worldPos.y,0)).g - .5f) + displacement*.05;
@@ -108,17 +155,20 @@ Category {
         //procedural_line = pow(procedural_line, i.texcoord.x* 10);
 
 #else
-         displacement = tex2D(_MainTex, i.texcoord + half2(-_Time.x * _Scroll1, 0)  ).a;
+        displacement = tex2D(_MainTex, i.texcoord + half2(-GetTime().x * _Scroll1, 0)  ).a;
 #endif
 
-         half4 tex = tex2D(_MainTex, i.texcoord + half2(-_Time.x * _Scroll2, 0) - displacement * _DisplacementIntensity);
+        half4 tex = tex2D(_MainTex, i.texcoord + half2(-GetTime().x * _Scroll2, 0) - displacement * _DisplacementIntensity);
+		tex.xyz *= step(0.01, tex.xyz);
+
 #ifdef AUDIO_REACTIVE
         tex = tex * .5 + 2 * procedural_line * ( envelope * envelopeHalf);
 #endif
         float4 color = i.color * tex;
         color = float4(color.rgb * color.a, 1.0);
         color = SrgbToNative(color);
-        return color;
+     //   FRAG_MOBILESELECT(color);
+        return color * _Dissolve;
       }
       ENDCG
     }

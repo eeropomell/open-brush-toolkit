@@ -12,9 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 Shader "Brush/Special/DiamondHull" {
   Properties {
     _MainTex("Texture", 2D) = "white" {}
+
+
+    _TimeOverrideValue("Time Override Value", Vector) = (0,0,0,0)
+    _TimeBlend("Time Blend", Float) = 0
+    _TimeSpeed("Time Speed", Float) = 1.0
+
+    _Opacity ("Opacity", Range(0, 1)) = 1
+    _Dissolve ("Dissolve", Range(0, 1)) = 1
+    _ClipStart("Clip Start", Float) = 0
+    _ClipEnd("Clip End", Float) = -1
   }
 
   SubShader {
@@ -24,21 +48,31 @@ Shader "Brush/Special/DiamondHull" {
     Fog{ Mode Off }
 
     CGPROGRAM
-      #pragma target 3.0
+      #pragma target 4.0
       #pragma surface surf StandardSpecular vertex:vert nofog
       #pragma multi_compile __ AUDIO_REACTIVE
       #pragma multi_compile __ TBT_LINEAR_TARGET
+      #pragma multi_compile __ SELECTION_ON
+
       #include "../../../Shaders/Include/Brush.cginc"
       #include "Assets/ThirdParty/Noise/Shaders/Noise.cginc"
+      #include "../../../Shaders/Include/MobileSelection.cginc"
 
       sampler2D _MainTex;
 
+      uniform half _ClipStart;
+      uniform half _ClipEnd;
+      uniform half _Dissolve;
+      uniform half _Opacity;
+
       struct Input {
+        float4 vertex : SV_POSITION;
         float4 color : Color;
         float2 tex : TEXCOORD0;
         float3 viewDir;
         float3 worldPos;
         float3 worldNormal;
+        uint id : SV_VertexID;
         INTERNAL_DATA
       };
 
@@ -124,7 +158,7 @@ Shader "Brush/Special/DiamondHull" {
         const float nmedium = 1;
         const float nfilm = 1.3;
         const float ninternal = 1;
-        
+
         const float cos0 = abs(dot(I, N));
 
         //float3 thickTex = texture(thickness, u, v);
@@ -138,14 +172,34 @@ Shader "Brush/Special/DiamondHull" {
         return float3(red, green, blue);
       }
 
-      void vert (inout appdata_full v, out Input o) {
+      struct appdata_full_plus_id {
+        float4 vertex : POSITION;
+        float4 tangent : TANGENT;
+        float3 normal : NORMAL;
+        float4 texcoord : TEXCOORD0;
+        float4 texcoord1 : TEXCOORD1;
+        float4 texcoord2 : TEXCOORD2;
+        float4 texcoord3 : TEXCOORD3;
+        fixed4 color : COLOR;
+        uint id : SV_VertexID;
+        UNITY_VERTEX_INPUT_INSTANCE_ID
+      };
+
+      void vert (inout appdata_full_plus_id v, out Input o) {
         o.color = TbVertToSrgb(o.color);
         UNITY_INITIALIZE_OUTPUT(Input, o);
         o.tex = v.texcoord.xy;
+        o.id = v.id;
       }
 
       // Input color is srgb
       void surf (Input IN, inout SurfaceOutputStandardSpecular o) {
+
+        #ifdef SHADER_SCRIPTING_ON
+        if (_ClipEnd > 0 && !(IN.id.x > _ClipStart && IN.id.x < _ClipEnd)) discard;
+        if (_Dissolve < 1 && Dither8x8(IN.vertex.xy) >= _Dissolve) discard;
+        #endif
+
         // Hardcode some shiny specular values
         o.Smoothness = .8;
         o.Albedo = IN.color * .2;
@@ -153,16 +207,20 @@ Shader "Brush/Special/DiamondHull" {
         // Calculate rim
         half rim = 1.0 - abs(dot(normalize(IN.viewDir), IN.worldNormal));
         rim *= 1-pow(rim,5);
-        
+
         const float3 I = (_WorldSpaceCameraPos - IN.worldPos);
         rim = lerp(rim, 150,
               1 - saturate(abs(dot(normalize(I), IN.worldNormal)) / .1));
 
-        float3 diffraction = tex2D(_MainTex, half2(rim + _Time.x * .3 + o.Normal.x, rim + o.Normal.y)).xyz;
+        float3 diffraction = tex2D(_MainTex, half2(rim + GetTime().x * .3 + o.Normal.x, rim + o.Normal.y)).xyz;
         diffraction = GetDiffraction(diffraction, o.Normal, normalize(IN.viewDir));
 
         o.Emission = rim * IN.color * diffraction * .5 + rim * diffraction * .25;
+        // SURF_FRAG_MOBILESELECT(o);
         o.Specular = SrgbToNative(IN.color).rgb * clamp(diffraction, .0, 1);
+        o.Emission *= _Opacity;
+        o.Albedo *= _Opacity;
+        o.Specular *= _Opacity;
       }
     ENDCG
   }

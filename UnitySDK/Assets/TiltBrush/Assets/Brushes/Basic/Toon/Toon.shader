@@ -12,42 +12,77 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 Shader "Brush/Special/Toon" {
 Properties {
   _MainTex ("Base (RGB) Trans (A)", 2D) = "white" {}
   _OutlineMax("Maximum outline size", Range(0, .5)) = .005
+
+  _Dissolve("Dissolve", Range(0,1)) = 1
+	_ClipStart("Clip Start", Float) = 0
+	_ClipEnd("Clip End", Float) = -1
 }
 
 CGINCLUDE
   #include "UnityCG.cginc"
   #include "../../../Shaders/Include/Brush.cginc"
   #include "Assets/ThirdParty/Noise/Shaders/Noise.cginc"
+  #include "../../../Shaders/Include/MobileSelection.cginc"
   #pragma multi_compile __ AUDIO_REACTIVE
   #pragma multi_compile __ TBT_LINEAR_TARGET
   #pragma multi_compile_fog
+  #pragma multi_compile __ SELECTION_ON
   #pragma target 3.0
   sampler2D _MainTex;
   float4 _MainTex_ST;
   float _OutlineMax;
+
+  uniform half _ClipStart;
+  uniform half _ClipEnd;
+  uniform half _Dissolve;
 
   struct appdata_t {
     float4 vertex : POSITION;
     fixed4 color : COLOR;
     float3 normal : NORMAL;
     float3 texcoord : TEXCOORD0;
+    uint id : SV_VertexID;
+
+    UNITY_VERTEX_INPUT_INSTANCE_ID
   };
 
   struct v2f {
-    float4 vertex : SV_POSITION;
+    float4 pos : SV_POSITION;
     fixed4 color : COLOR;
     float2 texcoord : TEXCOORD0;
+    uint id : TEXCOORD2;
     UNITY_FOG_COORDS(1)
+
+    UNITY_VERTEX_OUTPUT_STEREO
   };
 
   v2f vertInflate (appdata_t v, float inflate)
   {
 
     v2f o;
+
+    UNITY_SETUP_INSTANCE_ID(v);
+    UNITY_INITIALIZE_OUTPUT(v2f, o);
+    UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
     float outlineEnabled = inflate;
     float radius = v.texcoord.z;
     inflate *= radius * .4;
@@ -65,11 +100,11 @@ CGINCLUDE
 
     // Technically these are not yet in NDC because they haven't been divided by W, so their
     // range is currently [-W, W].
-    o.vertex = UnityObjectToClipPos(float4(v.vertex.xyz + v.normal.xyz * bulge, v.vertex.w));
+    o.pos = UnityObjectToClipPos(float4(v.vertex.xyz + v.normal.xyz * bulge, v.vertex.w));
     float4 outline_NDC = UnityObjectToClipPos(float4(v.vertex.xyz + v.normal.xyz * inflate, v.vertex.w));
 
     // Displacement in proper NDC coords (e.g. [-1, 1])
-    float3 disp = outline_NDC.xyz / outline_NDC.w - o.vertex.xyz / o.vertex.w;
+    float3 disp = outline_NDC.xyz / outline_NDC.w - o.pos.xyz / o.pos.w;
 
     // Magnitude is a scaling factor to shrink large outlines down to a max width, in NDC space.
     // Notice here we're only measuring 2D displacment in X and Y.
@@ -81,19 +116,20 @@ CGINCLUDE
     // component so both sides of the += operator below are in the same space. Also note
     // that the w component is a function of depth, so modifying X and Y independent of Z
     // should mean that the original w value remains valid.
-    o.vertex.xyz += float3(disp.xy * mag, disp.z) * o.vertex.w * outlineEnabled;
+    o.pos.xyz += float3(disp.xy * mag, disp.z) * o.pos.w * outlineEnabled;
 
     // Push Z back to avoid z-fighting when scaled very small. This is not legit,
     // mathematically speaking and likely causes crazy surface derivitives.
-    o.vertex.z -= disp.z * o.vertex.w * outlineEnabled;
+    o.pos.z -= disp.z * o.pos.w * outlineEnabled;
 
-        o.color = v.color;
-        o.color.a = 1;
-        o.color.xyz += worldNormal.y *.2;
-        o.color.xyz = max(0, o.color.xyz);
-        o.texcoord = TRANSFORM_TEX(v.texcoord,_MainTex);
-    UNITY_TRANSFER_FOG(o, o.vertex);
-        return o;
+    o.color = v.color;
+    o.color.a = 1;
+    o.color.xyz += worldNormal.y *.2;
+    o.color.xyz = max(0, o.color.xyz);
+    o.texcoord = TRANSFORM_TEX(v.texcoord,_MainTex);
+    UNITY_TRANSFER_FOG(o, o.pos);
+    o.id = (float2)v.id;
+    return o;
   }
 
   v2f vert (appdata_t v)
@@ -110,14 +146,26 @@ CGINCLUDE
 
   fixed4 fragBlack (v2f i) : SV_Target
   {
+    #ifdef SHADER_SCRIPTING_ON
+    if (_ClipEnd > 0 && !(i.id.x > _ClipStart && i.id.x < _ClipEnd)) discard;
+    if (_Dissolve < 1 && Dither8x8(i.pos.xy) >= _Dissolve) discard;
+    #endif
+
     float4 color = float4(0,0,0,1);
     UNITY_APPLY_FOG(i.fogCoord, color);
+   // FRAG_MOBILESELECT(color)
     return color;
   }
 
   fixed4 fragColor (v2f i) : SV_Target
   {
+    #ifdef SHADER_SCRIPTING_ON
+    if (_ClipEnd > 0 && !(i.id.x > _ClipStart && i.id.x < _ClipEnd)) discard;
+    if (_Dissolve < 1 && Dither8x8(i.pos.xy) >= _Dissolve) discard;
+    #endif
+
     UNITY_APPLY_FOG(i.fogCoord, i.color);
+   // FRAG_MOBILESELECT(i.color)
     return i.color;
   }
 

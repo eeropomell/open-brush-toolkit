@@ -12,6 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 Shader "Brush/Special/HypercolorDoubleSided" {
 Properties {
   _Color ("Main Color", Color) = (1,1,1,1)
@@ -20,6 +34,15 @@ Properties {
   _MainTex ("Base (RGB) TransGloss (A)", 2D) = "white" {}
   _BumpMap ("Normalmap", 2D) = "bump" {}
   _Cutoff ("Alpha cutoff", Range(0,1)) = 0.5
+
+
+ _TimeOverrideValue("Time Override Value", Vector) = (0,0,0,0)
+ _TimeBlend("Time Blend", Float) = 0
+ _TimeSpeed("Time Speed", Float) = 1.0
+
+ _Dissolve("Dissolve", Range(0,1)) = 1
+ _ClipStart("Clip Start", Float) = 0
+ _ClipEnd("Clip End", Float) = -1
 }
     SubShader {
     Tags {"Queue"="AlphaTest" "IgnoreProjector"="True" "RenderType"="TransparentCutout"}
@@ -27,11 +50,29 @@ Properties {
     LOD 100
 
     CGPROGRAM
-    #pragma target 3.0
-    #pragma surface surf StandardSpecular vertex:vert alphatest:_Cutoff addshadow
+    #pragma target 4.0
+    #pragma surface surf StandardSpecular vertex:vert addshadow
     #pragma multi_compile __ AUDIO_REACTIVE
     #pragma multi_compile __ TBT_LINEAR_TARGET
+    #pragma multi_compile __ SELECTION_ON
+    // Faster compiles
+    #pragma skip_variants INSTANCING_ON
+
+
     #include "../../../Shaders/Include/Brush.cginc"
+    #include "../../../Shaders/Include/MobileSelection.cginc"
+
+    struct appdata {
+      float4 vertex : POSITION;
+      float3 texcoord : TEXCOORD0;
+      float3 texcoord1 : TEXCOORD1;
+      float3 texcoord2 : TEXCOORD2;
+      half3 normal : NORMAL;
+      fixed4 color : COLOR;
+      float4 tangent : TANGENT;
+      uint id : SV_VertexID;
+      UNITY_VERTEX_INPUT_INSTANCE_ID
+    };
 
     struct Input {
       float2 uv_MainTex;
@@ -39,14 +80,22 @@ Properties {
       float4 color : Color;
       float3 worldPos;
       fixed vface : VFACE;
+      uint id : TEXCOORD2;
+      float4 screenPos;
     };
 
     sampler2D _MainTex;
     sampler2D _BumpMap;
     fixed4 _Color;
     half _Shininess;
+    fixed _Cutoff;
 
-    void vert (inout appdata_full v) {
+    uniform half _ClipStart;
+    uniform half _ClipEnd;
+    uniform half _Dissolve;
+
+    void vert (inout appdata v, out Input o) {
+      UNITY_INITIALIZE_OUTPUT(Input, o);
       v.color = TbVertToSrgb(v.color);
 
       float t = 0.0;
@@ -61,12 +110,19 @@ Properties {
                 * waveIntensity)
               ;
 #endif
+      o.id = v.id;
     }
 
     void surf (Input IN, inout SurfaceOutputStandardSpecular o) {
+
+      #ifdef SHADER_SCRIPTING_ON
+      if (_ClipEnd > 0 && !(IN.id.x > _ClipStart && IN.id.x < _ClipEnd)) discard;
+      if (_Dissolve < 1 && Dither8x8(IN.screenPos.xy / IN.screenPos.w * _ScreenParams) >= _Dissolve) discard;
+      #endif
+
       fixed4 tex = tex2D(_MainTex, IN.uv_MainTex);
 
-      float scroll = _Time.z;
+      float scroll = GetTime().z;
 #ifdef AUDIO_REACTIVE
       float3 localPos = mul(xf_I_CS, float4(IN.worldPos, 1.0)).xyz;
       float t = length(localPos) * .5;
@@ -88,14 +144,17 @@ Properties {
       o.Specular = SrgbToNative(_SpecColor * tex).rgb;
       o.Normal = UnpackNormal(tex2D(_BumpMap, IN.uv_BumpMap));
       o.Alpha = tex.a * IN.color.a;
+      if (o.Alpha < _Cutoff) {
+        discard;
+      }
+      o.Alpha = 1;
 #ifdef AUDIO_REACTIVE
       o.Emission = o.Albedo;
       o.Albedo = .2;
       o.Specular *= .5;
 #endif
-
+   //   SURF_FRAG_MOBILESELECT(o);
       o.Normal.z *= IN.vface;
-
     }
     ENDCG
     }

@@ -12,6 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //
 // Tilt Brush variant of the Blocks glass shader
 //
@@ -37,8 +51,10 @@ Shader  "Blocks/BlocksGlass"  {
   #pragma surface surf StandardSpecular vertex:vert fullforwardshadows nofog
   #pragma target 3.0
   #pragma multi_compile __ TBT_LINEAR_TARGET
+  #pragma multi_compile __ SELECTION_ON HIGHLIGHT_ON
 
   #include "../../../Shaders/Include/Brush.cginc"
+  #include "../../../Shaders/Include/MobileSelection.cginc"
 
   struct Input {
     float3 viewDir;
@@ -63,14 +79,15 @@ Shader  "Blocks/BlocksGlass"  {
     o.Albedo = 0;
     o.Specular = _Color.rgb * backfaceDimming;
 
-    // Currently rim lighting is causing the entire object to go white in ODS renders.
-    // TODO(jcowles,skillman): figure out what's causing this.
-    #if !defined(ODS_RENDER_CM)
+// Currently rim lighting is causing the entire object to go white in ODS renders.
+// TODO: figure out what's causing this.
+#if !defined(ODS_RENDER_CM)
     // Rim Lighting
     o.Emission = (pow(1 - saturate(dot(IN.viewDir, o.Normal)), _RimPower)) * _RimIntensity * backfaceDimming;
-    #endif
+#endif
 
     o.Smoothness = _Shininess;
+  //  SURF_FRAG_MOBILESELECT(o);
   }
   ENDCG
 

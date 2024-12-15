@@ -12,6 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 Shader "Brush/Special/LightWire" {
   Properties {
     _Color ("Main Color", Color) = (1,1,1,1)
@@ -19,22 +33,35 @@ Shader "Brush/Special/LightWire" {
     _Shininess ("Shininess", Range (0.01, 1)) = 0.078125
     _MainTex ("Base (RGB) TransGloss (A)", 2D) = "white" {}
     _BumpMap ("Normalmap", 2D) = "bump" {}
+
+
+    _TimeOverrideValue("Time Override Value", Vector) = (0,0,0,0)
+    _TimeBlend("Time Blend", Float) = 0
+    _TimeSpeed("Time Speed", Float) = 1.0
+
+    _Dissolve("Dissolve", Range(0,1)) = 1
+    _ClipStart("Clip Start", Float) = 0
+    _ClipEnd("Clip End", Float) = -1
   }
+
   SubShader {
     Cull Back
     CGPROGRAM
-    #pragma target 3.0
+    #pragma target 4.0
     #pragma surface surf StandardSpecular vertex:vert noshadow
     #pragma multi_compile __ AUDIO_REACTIVE
     #pragma multi_compile __ TBT_LINEAR_TARGET
+    #pragma multi_compile __ SELECTION_ON
+    #pragma multi_compile_local __ SHADER_SCRIPTING_ON
+
     #include "../../../Shaders/Include/Brush.cginc"
+    #include "../../../Shaders/Include/MobileSelection.cginc"
 
     struct Input {
       float2 uv_MainTex;
-      float2 uv_BumpMap;
       float4 color : Color;
-      float3 worldPos;
-      float3 viewDir;
+      float2 id : TEXCOORD2;
+      float4 screenPos;
     };
 
     sampler2D _MainTex;
@@ -42,7 +69,25 @@ Shader "Brush/Special/LightWire" {
     fixed4 _Color;
     half _Shininess;
 
-    void vert (inout appdata_full v) {
+    uniform half _ClipStart;
+    uniform half _ClipEnd;
+    uniform half _Dissolve;
+
+    struct appdata_full_plus_id {
+      float4 vertex : POSITION;
+      float4 tangent : TANGENT;
+      float3 normal : NORMAL;
+      float4 texcoord : TEXCOORD0;
+      float4 texcoord1 : TEXCOORD1;
+      float4 texcoord2 : TEXCOORD2;
+      float4 texcoord3 : TEXCOORD3;
+      fixed4 color : COLOR;
+      uint id : SV_VertexID;
+      UNITY_VERTEX_INPUT_INSTANCE_ID
+    };
+
+    void vert (inout appdata_full_plus_id v, out Input o) {
+      UNITY_INITIALIZE_OUTPUT(Input, o);
       v.color = TbVertToSrgb(v.color);
 
       // Radius is stored in texcoord (used to be tangent.w)
@@ -54,6 +99,7 @@ Shader "Brush/Special/LightWire" {
 
       radius *= 0.9;
       v.vertex.xyz += v.normal * lights * radius;
+      o.id = (float2)v.id;
     }
 
     float3 SrgbToNative3(float3 color) {
@@ -62,6 +108,12 @@ Shader "Brush/Special/LightWire" {
 
     // Input color is srgb
     void surf (Input IN, inout SurfaceOutputStandardSpecular o) {
+
+      #ifdef SHADER_SCRIPTING_ON
+      if (_ClipEnd > 0 && !(IN.id.x > _ClipStart && IN.id.x < _ClipEnd)) discard;
+      if (_Dissolve < 1 && Dither8x8(IN.screenPos.xy / IN.screenPos.w * _ScreenParams) >= _Dissolve) discard;
+      #endif
+
       float envelope = sin ( fmod ( IN.uv_MainTex.x*2, 1.0f) * 3.14159);
       float lights = envelope < .1 ? 1 : 0;
       float border = abs(envelope - .1) < .01 ? 0 : 1;
@@ -72,7 +124,7 @@ Shader "Brush/Special/LightWire" {
 #ifdef AUDIO_REACTIVE
       t = _BeatOutputAccum.x*10;
 #else
-      t = _Time.w;
+      t = GetTime().w;
 #endif
 
       if (lights) {
@@ -100,6 +152,8 @@ Shader "Brush/Special/LightWire" {
       o.Albedo   = SrgbToNative3(o.Albedo);
       o.Emission = SrgbToNative3(o.Emission);
       o.Specular = SrgbToNative3(o.Specular);
+
+  //    SURF_FRAG_MOBILESELECT(o);
     }
     ENDCG
   }

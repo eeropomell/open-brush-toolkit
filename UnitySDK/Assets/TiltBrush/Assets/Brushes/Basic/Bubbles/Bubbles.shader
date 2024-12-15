@@ -12,6 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 Shader "Brush/Particle/Bubbles" {
 Properties {
   _MainTex ("Particle Texture", 2D) = "white" {}
@@ -19,6 +33,15 @@ Properties {
   _ScrollJitterIntensity("Scroll Jitter Intensity", Float) = 1.0
   _ScrollJitterFrequency("Scroll Jitter Frequency", Float) = 1.0
   _SpreadRate ("Spread Rate", Range(0.3, 5)) = 1.539
+
+  _TimeOverrideValue("Time Override Value", Vector) = (0,0,0,0)
+  _TimeBlend("Time Blend", Float) = 0
+  _TimeSpeed("Time Speed", Float) = 1.0
+
+  _Opacity ("Opacity", Range(0, 1)) = 1
+  _Dissolve ("Dissolve", Range(0, 1)) = 1
+	_ClipStart("Clip Start", Float) = 0
+	_ClipEnd("Clip End", Float) = -1
 }
 
 Category {
@@ -37,19 +60,29 @@ Category {
       #pragma multi_compile_particles
       #pragma target 3.0
       #pragma multi_compile __ TBT_LINEAR_TARGET
+      #pragma multi_compile __ SELECTION_ON
 
       #include "UnityCG.cginc"
       #include "../../../Shaders/Include/Brush.cginc"
       #include "../../../Shaders/Include/Particles.cginc"
       #include "Assets/ThirdParty/Noise/Shaders/Noise.cginc"
+      #include "../../../Shaders/Include/MobileSelection.cginc"
 
       sampler2D _MainTex;
       fixed4 _TintColor;
+
+      uniform half _ClipStart;
+      uniform half _ClipEnd;
+      uniform half _Dissolve;
+      uniform half _Opacity;
 
       struct v2f {
         float4 vertex : SV_POSITION;
         fixed4 color : COLOR;
         float2 texcoord : TEXCOORD0;
+        uint id : TEXCOORD2;
+
+        UNITY_VERTEX_OUTPUT_STEREO
       };
 
       float4 _MainTex_ST;
@@ -61,15 +94,15 @@ Category {
 
       float3 computeDisplacement(float3 seed, float timeOffset) {
         float3 jitter; {
-          float t = _Time.y * _ScrollRate + timeOffset;
-          jitter.x = sin(t       + _Time.y + seed.z * _ScrollJitterFrequency);
-          jitter.z = cos(t       + _Time.y + seed.x * _ScrollJitterFrequency);
-          jitter.y = cos(t * 1.2 + _Time.y + seed.x * _ScrollJitterFrequency);
+          float t = GetTime().y * _ScrollRate + timeOffset;
+          jitter.x = sin(t       + GetTime().y + seed.z * _ScrollJitterFrequency);
+          jitter.z = cos(t       + GetTime().y + seed.x * _ScrollJitterFrequency);
+          jitter.y = cos(t * 1.2 + GetTime().y + seed.x * _ScrollJitterFrequency);
           jitter *= _ScrollJitterIntensity;
         }
 
         float3 curl; {
-          float3 v = (seed + jitter) * .1 + _Time.x * 5;
+          float3 v = (seed + jitter) * .1 + GetTime().x * 5;
           float d = 30;
           curl = float3(curlX(v, d), curlY(v, d), curlZ(v, d)) * 10;
         }
@@ -78,7 +111,15 @@ Category {
       }
 
       v2f vert (ParticleVertexWithSpread_t v) {
+
+
+
         v2f o;
+
+        UNITY_SETUP_INSTANCE_ID(v);
+        UNITY_INITIALIZE_OUTPUT(v2f, o);
+        UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
         v.color = TbVertToSrgb(v.color);
         float birthTime = v.texcoord.w;
         float rotation = v.texcoord.z;
@@ -97,12 +138,18 @@ Category {
         o.color = v.color;
         o.color.a = 1;
         o.texcoord = TRANSFORM_TEX(v.texcoord.xy,_MainTex);
+        o.id = v.id;
 
         return o;
       }
 
       fixed4 frag (v2f i) : SV_Target
       {
+        #ifdef SHADER_SCRIPTING_ON
+        if (_ClipEnd > 0 && !(i.id.x > _ClipStart && i.id.x < _ClipEnd)) discard;
+        if (_Dissolve < 1 && Dither8x8(i.vertex.xy) >= _Dissolve) discard;
+        #endif
+
         float4 tex = tex2D(_MainTex, i.texcoord);
 
         // RGB Channels of the texture are affected by color
@@ -112,7 +159,14 @@ Category {
         float3 highlightcolor = tex.a;
 
         float4 color = float4(basecolor + highlightcolor, 1);
-        return SrgbToNative(color);
+        color = SrgbToNative(color);
+
+#if SELECTION_ON
+        color.rgb = GetSelectionColor() * tex.r;
+        color.a = tex.a;
+#endif
+
+        return color * _Opacity;
       }
       ENDCG
     }

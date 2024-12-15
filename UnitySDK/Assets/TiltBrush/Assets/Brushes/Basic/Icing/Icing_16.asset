@@ -3,8 +3,9 @@
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
-  m_PrefabParentObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
@@ -16,8 +17,8 @@ MonoBehaviour:
   m_DurableName: Icing
   m_Material: {fileID: 2100000, guid: 2f212815f4d3c1a4681afeeaf9c6dc37, type: 2}
   m_IsParticle: 0
-  m_uv0Size: 2
-  m_uv0Semantic: 5
+  m_uv0Size: 3
+  m_uv0Semantic: 3
   m_uv1Size: 0
   m_uv1Semantic: 0
   m_bUseNormals: 1

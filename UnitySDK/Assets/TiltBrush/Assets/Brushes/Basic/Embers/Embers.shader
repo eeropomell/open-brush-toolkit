@@ -12,6 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2020 The Tilt Brush Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 Shader "Brush/Particle/Embers" {
 Properties {
   _TintColor ("Tint Color", Color) = (0.5,0.5,0.5,0.5)
@@ -21,6 +35,15 @@ Properties {
   _ScrollJitterIntensity("Scroll Jitter Intensity", Float) = 1.0
   _ScrollJitterFrequency("Scroll Jitter Frequency", Float) = 1.0
   _SpreadRate ("Spread Rate", Range(0.3, 5)) = 1.539
+
+
+  _TimeOverrideValue("Time Override Value", Vector) = (0,0,0,0)
+  _TimeBlend("Time Blend", Float) = 0
+  _TimeSpeed("Time Speed", Float) = 1.0
+
+  _Dissolve("Dissolve", Range(0, 1)) = 1
+  _ClipStart("Clip Start", Float) = 0
+  _ClipEnd("Clip End", Float) = -1
 }
 
 Category {
@@ -39,20 +62,29 @@ Category {
       #pragma multi_compile_particles
       #pragma multi_compile __ AUDIO_REACTIVE
       #pragma multi_compile __ TBT_LINEAR_TARGET
+      #pragma multi_compile __ SELECTION_ON
       #pragma target 3.0
 
       #include "UnityCG.cginc"
       #include "../../../Shaders/Include/Brush.cginc"
       #include "../../../Shaders/Include/Particles.cginc"
       #include "Assets/ThirdParty/Noise/Shaders/Noise.cginc"
+      #include "../../../Shaders/Include/MobileSelection.cginc"
 
       sampler2D _MainTex;
       fixed4 _TintColor;
+
+      uniform half _ClipStart;
+      uniform half _ClipEnd;
+      uniform half _Dissolve;
 
       struct v2f {
         float4 vertex : SV_POSITION;
         fixed4 color : COLOR;
         float2 texcoord : TEXCOORD0;
+        uint id : TEXCOORD2;
+
+        UNITY_VERTEX_OUTPUT_STEREO
       };
 
       float4 _MainTex_ST;
@@ -68,30 +100,45 @@ Category {
       // seed is a value in [0, 1]
       // t01 is a time value in [0, 1]
       float3 ComputeDisplacement(float3 pos, float seed, float t01) {
-        float t2 = _Time.y;
+        float t2 = GetTime().y;
+        float floatUpTime01 = t01;
+
+#if SELECTION_ON
+        t01 = 0;
+        t2 = 0;
+#endif
 
         // Animate the motion of the embers
         // Accumulate all displacement into a common, pre-transformed space.
         float4 dispVec = float4(_ScrollDistance, 0.0) * t01;
 
         dispVec.x += sin(t01 * _ScrollJitterFrequency + seed * 100 + t2 + pos.z) * _ScrollJitterIntensity;
-        dispVec.y += (fmod(seed * 100, 1) - 0.5) * _ScrollDistance.y * t01;
+        dispVec.y += (fmod(seed * 100, 1) - 0.5) * _ScrollDistance.y * floatUpTime01;
         dispVec.z += cos(t01 * _ScrollJitterFrequency + seed * 100 + t2 + pos.x) * _ScrollJitterIntensity;
 
 #ifdef AUDIO_REACTIVE
         float fft = (tex2Dlod(_FFTTex, float4(pos.y,0,0,0)).b)*2 + .1;
         dispVec.y += fft;
 #endif
-        // Allow scaling to affect particle speed and distance in toolkit
-        return dispVec * kDecimetersToWorldUnits  * length(unity_ObjectToWorld[0].xyz);
+
+#if SELECTION_ON
+        dispVec.y = abs(dispVec.y * 0.2);
+        dispVec *= 0.5;
+#endif
+        return dispVec * kDecimetersToWorldUnits;
       }
 
       v2f vert (ParticleVertexWithSpread_t v) {
         v.color = TbVertToSrgb(v.color);
         v2f o;
+
+        UNITY_SETUP_INSTANCE_ID(v);
+        UNITY_INITIALIZE_OUTPUT(v2f, o);
+        UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
         // Used as a random-ish seed for various calculations
         float seed = v.color.a;
-        float t01 = fmod(_Time.y*_ScrollRate + seed * 10, 1);
+        float t01 = fmod(GetTime().y*_ScrollRate + seed * 10, 1);
         float birthTime = v.texcoord.w;
         float rotation = v.texcoord.z;
         float halfSize = GetParticleHalfSize(v.corner.xyz, v.center, birthTime);
@@ -103,7 +150,7 @@ Category {
         // Ramp color from bright to dark over particle lifetime
         float3 incolor = v.color.rgb;
         float t_minus_1 = 1-t01;
-        float sparkle = (pow(abs(sin(_Time.y * 3 + seed * 10)), 30));
+        float sparkle = (pow(abs(sin(GetTime().y * 3 + seed * 10)), 30));
         v.color.rgb += pow(t_minus_1,10)*incolor*200;
         v.color.rgb += incolor * sparkle * 50;
 
@@ -126,7 +173,6 @@ Category {
         float4 corner_WS = OrientParticle_WS(center_WS.xyz, halfSize, v.vid, rotation);
         o.vertex = mul(UNITY_MATRIX_VP, corner_WS);
 #else
-        // TODO(pld): convince drew to use this version
         // Displacement is in canvas space
         // Note that we assume object space == canvas space (which it is, for TB)
         center = center + float4(disp.xyz, 0);
@@ -136,17 +182,27 @@ Category {
 
         o.color = v.color;
         o.texcoord = TRANSFORM_TEX(v.texcoord.xy,_MainTex);
-
+        o.id = (float2)v.id;
         return o;
       }
 
       // i.color is srgb
       fixed4 frag (v2f i) : SV_Target
       {
-        float4 color = 2.0f * i.color * _TintColor * tex2D(_MainTex, i.texcoord);
+        #ifdef SHADER_SCRIPTING_ON
+        if (_ClipEnd > 0 && !(i.id.x > _ClipStart && i.id.x < _ClipEnd)) discard;
+        // It's hard to get alpha curves right so use dithering for hdr shaders
+        if (_Dissolve < 1 && Dither8x8(i.vertex.xy) >= _Dissolve) discard;
+        #endif
+
+        float4 texCol = tex2D(_MainTex, i.texcoord);
+        float4 color = 2.0f * i.color * _TintColor * texCol;
         color = float4(color.rgb * color.a, 1.0);
         color = SrgbToNative(color);
-        return color;
+#if SELECTION_ON
+        color.rgb = GetSelectionColor() * texCol.a;
+#endif
+        return color * _Dissolve;
       }
       ENDCG
     }
