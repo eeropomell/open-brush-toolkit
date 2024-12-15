@@ -62,6 +62,7 @@ Category {
       #pragma multi_compile_particles
       #pragma multi_compile __ TBT_LINEAR_TARGET
       #pragma multi_compile __ SELECTION_ON
+      #pragma multi_compile_local __ SHADER_SCRIPTING_ON
       #pragma target 3.0 // Required -> compiler error: too many instructions for SM 2.0
 
       #include "UnityCG.cginc"

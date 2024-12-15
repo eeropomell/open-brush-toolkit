@@ -44,6 +44,7 @@ SubShader {
   #pragma target 3.0
   #pragma multi_compile __ TBT_LINEAR_TARGET
   #pragma multi_compile __ SELECTION_ON
+  #pragma multi_compile_local __ SHADER_SCRIPTING_ON
   // Faster compiles
   #pragma skip_variants INSTANCING_ON
   #include "../../../Shaders/Include/Brush.cginc"

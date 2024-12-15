@@ -9,7 +9,7 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: Fire
   m_Shader: {fileID: 4800000, guid: aed6c5abd15318e448cc6f01d2ac0dd1, type: 3}
-  m_ShaderKeywords: 
+  m_ShaderKeywords: SHADER_SCRIPTING_ON
   m_LightmapFlags: 5
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0

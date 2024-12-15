@@ -44,6 +44,7 @@ Properties {
 
 CGINCLUDE
   #pragma multi_compile __ SELECTION_ON
+  #pragma multi_compile_local __ SHADER_SCRIPTING_ON
   #include "UnityCG.cginc"
   #include "../../../Shaders/Include/Brush.cginc"
 
