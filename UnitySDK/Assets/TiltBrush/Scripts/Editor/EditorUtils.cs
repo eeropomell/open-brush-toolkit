@@ -123,6 +123,11 @@ public class EditorUtils {
           originalTriangles = originalTriangles
         }.Schedule(strokeIDs.Count, 1).Complete();
 
+
+        originalTriangles.Dispose();
+        nativeStrokeIDs.Dispose();
+        nativeUV3.Dispose();
+
         int strokeIndex = 0;
         foreach (float strokeID in strokeIDs)
         {
