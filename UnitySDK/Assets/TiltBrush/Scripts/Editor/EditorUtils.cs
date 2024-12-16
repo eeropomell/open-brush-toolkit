@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
@@ -22,12 +23,14 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine.Profiling;
+using Object = UnityEngine.Object;
 
 namespace TiltBrushToolkit {
 
 public class EditorUtils {
 
   #region Tilt Menu
+
 
     private static async Task Mesh2Stroke(GameObject obj)
   {
@@ -149,13 +152,16 @@ public class EditorUtils {
           {
             // this could definitely be written in a simpler way but this version (of the entire tool)
             // is still a prototype, so there's no point in improving this part of the code yet.
-            int* p = (int*)triangles_.GetUnsafePtr();
+       /*     int* p = (int*)triangles_.GetUnsafePtr();
             NativeArray<int> castedTris = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<int>(p + startingIndex, triangleCount, Allocator.None);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref castedTris, AtomicSafetyHandle.GetTempUnsafePtrSliceHandle());
 #endif
 
-            int[] triangles = castedTris.ToArray();
+            int[] triangles = castedTris.ToArray();*/
+            int[] triangles = new int[triangleCount];
+
+            NativeArray<int>.Copy(triangles_, startingIndex, triangles, 0, triangleCount);
 
             var newMesh_ = GetMeshSubset(mesh,triangles);
             newO.GetComponent<MeshFilter>().mesh = newMesh_;
@@ -164,6 +170,7 @@ public class EditorUtils {
 
 
         }
+
 
         triangles_.Dispose();
         triangleCounts.Dispose();
