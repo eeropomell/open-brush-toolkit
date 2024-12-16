@@ -46,8 +46,6 @@ public class AddStrokeIds
 
                 float currentVertTimestamp = uv2[vertIndex].x;
 
-                Debug.Log($"vts: {uv2[vertIndex].x}, {uv2[vertIndex].y}");
-
                 if (vertIndex == 0) // First vertex therefore first stroke
                 {
                     timestamps.Add(currentVertTimestamp);
@@ -68,8 +66,6 @@ public class AddStrokeIds
             }
 
             var dataUVs = new List<Vector3>();
-
-            Debug.Log("timestamp_length " + timestamps.Count);
 
             for (int i = 0; i < uv2.Count; i++)
             {
