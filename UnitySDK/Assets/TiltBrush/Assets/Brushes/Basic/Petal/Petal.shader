@@ -47,6 +47,7 @@ Shader "Brush/Special/Petal" {
       #pragma multi_compile __ AUDIO_REACTIVE
       #pragma multi_compile __ ODS_RENDER
       #pragma multi_compile __ SELECTION_ON
+      #pragma multi_compile_local __ SHADER_SCRIPTING_ON
       #include "../../../Shaders/Include/Brush.cginc"
       #include "../../../Shaders/Include/MobileSelection.cginc"
 
