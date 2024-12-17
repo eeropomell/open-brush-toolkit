@@ -71,7 +71,8 @@ public class EditorUtils {
         Profiler.BeginSample("StrokeIDs.Add");
         HashSet<float> strokeIDs = new HashSet<float>();
 
-
+        int totalVertexCount = 0;
+        List<int> vertexCounts = new List<int>();
         for (int i = 0; ; i++)
         {
           // we store all possible strokeIDs in the uv3.y of the mesh
@@ -83,7 +84,10 @@ public class EditorUtils {
           {
             break;
           }
+
+          totalVertexCount += (int)uv3[i].z;
           strokeIDs.Add(uv3[i].y);
+          vertexCounts.Add((int)uv3[i].z);
         }
         Profiler.EndSample();
 
@@ -114,6 +118,17 @@ public class EditorUtils {
           triangleCounts = triangleCounts,
         }.Schedule(strokeIDs.Count, 1).Complete();
 
+        NativeArray<int> vertexMap = new NativeArray<int>(mesh.vertexCount, Allocator.Persistent);
+
+        var job3 = new CreateVertexArraysJob()
+        {
+          vertexMap = vertexMap,
+          uv3 = nativeUV3,
+          strokeIDs = nativeStrokeIDs
+        }.Schedule(strokeIDs.Count,1);
+
+        job3.Complete();
+
         // Second pass
         NativeArray<int> triangles_ = new NativeArray<int>(mesh.triangles.Length, Allocator.Persistent);
 
@@ -123,13 +138,14 @@ public class EditorUtils {
           triangles = triangles_,
           strokeIDs = nativeStrokeIDs,
           triangleCounts = triangleCounts,
-          originalTriangles = originalTriangles
+          originalTriangles = originalTriangles,
+          vertexMap = vertexMap
         }.Schedule(strokeIDs.Count, 1).Complete();
-
 
         originalTriangles.Dispose();
         nativeStrokeIDs.Dispose();
         nativeUV3.Dispose();
+        vertexMap.Dispose();
 
         int strokeIndex = 0;
         foreach (float strokeID in strokeIDs)
@@ -141,12 +157,13 @@ public class EditorUtils {
 
           int triangleCount = triangleCounts[strokeIndex];
           int startingIndex = 0;
+          int startingVertexIndex = 0;
 
           for (int i = 0; i < strokeIndex; i++)
           {
             startingIndex += (triangleCounts[i]);
+            startingVertexIndex += (vertexCounts[i]);
           }
-
 
           unsafe
           {
@@ -161,16 +178,25 @@ public class EditorUtils {
             int[] triangles = castedTris.ToArray();*/
             int[] triangles = new int[triangleCount];
 
-            NativeArray<int>.Copy(triangles_, startingIndex, triangles, 0, triangleCount);
+            int vertexCount = (int)uv3[strokeIndex].z;
+            Vector3[] vertices = new Vector3[vertexCount];
+            Vector2[] uv = new Vector2[vertexCount];
+            Vector3[] normals = new Vector3[vertexCount];
+            Color[] colors = new Color[vertexCount];
 
-            var newMesh_ = GetMeshSubset(mesh,triangles);
+            NativeArray<int>.Copy(triangles_, startingIndex, triangles, 0, triangleCount);
+            Array.Copy(mesh.vertices, startingVertexIndex, vertices, 0, vertexCount);
+            Array.Copy(mesh.uv, startingVertexIndex, uv, 0, vertexCount);
+            Array.Copy(mesh.normals, startingVertexIndex, normals, 0, vertexCount);
+            Array.Copy(mesh.colors, startingVertexIndex, colors, 0, vertexCount);
+
+            var newMesh_ = GetMeshSubset(mesh,triangles,vertices, uv, normals, colors);
             newO.GetComponent<MeshFilter>().mesh = newMesh_;
             strokeIndex++;
           }
 
 
         }
-
 
         triangles_.Dispose();
         triangleCounts.Dispose();
@@ -306,17 +332,18 @@ public class EditorUtils {
     return v;
   }
 
-  public static Mesh GetMeshSubset(Mesh OriginalMesh, int[] Triangles) {
+  public static Mesh GetMeshSubset(Mesh OriginalMesh, int[] Triangles, Vector3[] vertices = null, Vector2[] uv = null, Vector3[] normals = null,
+    Color[] colors = null) {
     Mesh newMesh = new Mesh();
     newMesh.name = OriginalMesh.name;
-    newMesh.vertices = OriginalMesh.vertices;
+    newMesh.vertices = vertices ?? OriginalMesh.vertices;
     newMesh.triangles = Triangles;
-    newMesh.uv = OriginalMesh.uv;
-    newMesh.uv2 = OriginalMesh.uv2;
-    newMesh.uv3 = OriginalMesh.uv3;
-    newMesh.colors = OriginalMesh.colors;
+    newMesh.uv = uv ?? OriginalMesh.uv;
+    //newMesh.uv2 = OriginalMesh.uv2; <-- not needed for now
+   // newMesh.uv3 = OriginalMesh.uv3;
+    newMesh.colors = colors ?? OriginalMesh.colors;
     newMesh.subMeshCount = OriginalMesh.subMeshCount;
-    newMesh.normals = OriginalMesh.normals;
+    newMesh.normals = normals ?? OriginalMesh.normals;
     //AssetDatabase.CreateAsset(newMesh, "Assets/"+mesh.name+"_submesh["+index+"].asset");
     return newMesh;
   }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Jobs;
 using Unity.Collections;
 using UnityEditor;
@@ -21,70 +22,77 @@ public class AddStrokeIds
         return Mathf.Abs(a - b) < epsilon;
     }
 
-
     private static void AddStrokeIds_(Transform[] selected)
     {
         int currentStrokeIndex = 0;
 
         foreach (var tr in selected)
-        {
-            // get the mesh of the selection
-            var mf = tr.GetComponent<MeshFilter>();
-            var mesh = mf.sharedMesh;
-            var uv2 = new List<Vector3>();
-
-            mesh.GetUVs(2, uv2);
-
-            float prevVertexTimestamp = -1;
-
-            // The following lists have one entry per stroke
-            var timestamps = new List<float>(); // Timestamps
-
-            // iterate all vertices
-            for (int vertIndex = 0; vertIndex < uv2.Count; vertIndex++)
             {
+                // get the mesh of the selection
+                var mf = tr.GetComponent<MeshFilter>();
+                var mesh = mf.sharedMesh;
+                var uv2 = new List<Vector3>();
 
-                float currentVertTimestamp = uv2[vertIndex].x;
+                mesh.GetUVs(2, uv2);
 
-                if (vertIndex == 0) // First vertex therefore first stroke
+                NativeArray<Vector3> NativeUV2 = new NativeArray<Vector3>(uv2.ToArray(), Allocator.TempJob);
+                NativeArray<float> NativeAllTimestamps = new NativeArray<float>(uv2.Count, Allocator.TempJob);
+
+                var strokeJob = new AddStrokeIdsJob()
                 {
-                    timestamps.Add(currentVertTimestamp);
-                }
+                    uv2 = NativeUV2,
+                    allTimestamps = NativeAllTimestamps
+                };
 
-                if (!AreFloatsEqual(currentVertTimestamp,prevVertexTimestamp))
+                JobHandle jobHandle = strokeJob.Schedule(uv2.Count, 64);
+
+                jobHandle.Complete();
+
+                HashSet<float> NativeTimestamps = new HashSet<float>(NativeAllTimestamps.ToArray());
+
+                NativeAllTimestamps.Dispose();
+
+                var nativeTimestampsArray = NativeTimestamps.ToArray();
+
+                NativeArray<float> NativeStrokeIDs = new NativeArray<float>(nativeTimestampsArray, Allocator.TempJob);
+                NativeArray<Vector2> strokeData = new NativeArray<Vector2>(NativeTimestamps.Count, Allocator.TempJob);
+
+                var StrokeJob3 = new CalculateVertexCountForEachStrokeID()
                 {
-                    // New Stroke
-                    if (vertIndex > 0) // Skip the first vertex
-                    {
-                        // Add new timestamp
-                        timestamps.Add(currentVertTimestamp);
-                        currentStrokeIndex++;
-                    }
-                }
+                    uv2= NativeUV2,
+                    strokeIDs = NativeStrokeIDs,
+                    strokeData = strokeData
+                }.Schedule(NativeTimestamps.Count, 1);
 
-                prevVertexTimestamp = currentVertTimestamp;
+                StrokeJob3.Complete();
+                NativeStrokeIDs.Dispose();
+
+                NativeArray<Vector3> NativeUV3 = new NativeArray<Vector3>(uv2.Count, Allocator.TempJob);
+
+                var StrokeJob2 = new AddStrokeIdsJob2()
+                {
+                    strokeData = strokeData,
+                    uv3 = NativeUV3,
+                    uv2 = NativeUV2
+                };
+
+                JobHandle jobHandle2 = StrokeJob2.Schedule(uv2.Count, 64);
+
+                jobHandle2.Complete();
+
+                mesh.SetUVs(3, NativeUV3.ToArray());
+                mf.mesh = mesh;
+
+                NativeUV3.Dispose();
+                strokeData.Dispose();
+                NativeUV2.Dispose();
+
             }
-
-            var dataUVs = new List<Vector3>();
-
-            for (int i = 0; i < uv2.Count; i++)
-            {
-                float strokeIndex = uv2[i].x;
-                if (timestamps.Count > i)
-                {
-                    dataUVs.Add(new Vector3(strokeIndex, timestamps[i], 0));
-                }
-                else
-                {
-                    dataUVs.Add(new Vector3(strokeIndex, 0, 0));
-                }
-
-            }
-
-
-
-            mesh.SetUVs(3, dataUVs);
-            mf.mesh = mesh;
-        }
     }
 }
+
+
+
+
+
+

@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
-
+using Unity.Burst;
+using Unity.Mathematics;
 
 // for explanation, see comments in Stroke2Mesh() method in EditorUtils.cs
+[BurstCompile]
 public struct CountTrianglesForStrokesJob : IJobParallelFor
 {
     [ReadOnly]
@@ -37,6 +39,6 @@ public struct CountTrianglesForStrokesJob : IJobParallelFor
     // todo: put this in a common place
     private static bool AreFloatsEqual(float a, float b, float epsilon = 0.00001f)
     {
-        return Mathf.Abs(a - b) < epsilon;
+        return math.abs(a - b) < epsilon;
     }
 }

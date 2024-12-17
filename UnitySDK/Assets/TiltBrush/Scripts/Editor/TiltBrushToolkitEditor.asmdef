@@ -1,7 +1,8 @@
 {
     "name": "TiltBrushToolkitEditor",
     "references": [
-        "TiltBrushToolkitRuntime"
+        "TiltBrushToolkitRuntime",
+        "Unity.Collections"
     ],
     "includePlatforms": [
         "Editor"
@@ -12,5 +13,6 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": []
+    "versionDefines": [],
+    "noEngineReferences": false
 }
