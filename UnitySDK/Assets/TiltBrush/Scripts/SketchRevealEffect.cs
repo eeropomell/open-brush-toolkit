@@ -46,9 +46,9 @@ public class SketchRevealEffect : MonoBehaviour
             meshRenderer.material = new Material(mat_);
 
             // this will hide the material at the beginning
-            meshRenderer.material.SetFloat("_ClipEnd",.1f);
-            meshRenderer.material.EnableKeyword("SHADER_SCRIPTING_ON");
-            meshRenderer.material.SetFloat("_Dissolve",dissolve);
+            meshRenderer.sharedMaterial.SetFloat("_ClipEnd",.1f);
+            meshRenderer.sharedMaterial.EnableKeyword("SHADER_SCRIPTING_ON");
+            meshRenderer.sharedMaterial.SetFloat("_Dissolve",dissolve);
 
             totalVertexCount += mf.sharedMesh.vertexCount;
 
@@ -86,7 +86,7 @@ public class SketchRevealEffect : MonoBehaviour
 
     private float GetStrokeID(MeshFilter stroke)
     {
-        Mesh mesh = stroke.mesh;
+        Mesh mesh = stroke.sharedMesh;
         if (mesh == null)
         {
             return -1;
@@ -145,8 +145,8 @@ public class SketchRevealEffect : MonoBehaviour
 
             mf = allStrokes_[i];
             MeshRenderer meshRenderer = mf.GetComponent<MeshRenderer>();
-            Material mat = meshRenderer.material;
-            Mesh mesh = mf.mesh;
+            Material mat = meshRenderer.sharedMaterial;
+            Mesh mesh = mf.sharedMesh;
 
             mat.SetFloat("_ClipEnd",.1f);
             mat.SetFloat("_Dissolve",dissolve);
@@ -162,8 +162,8 @@ public class SketchRevealEffect : MonoBehaviour
 
             mf = allStrokes_[i];
             MeshRenderer meshRenderer = mf.GetComponent<MeshRenderer>();
-            Material mat = meshRenderer.material;
-            Mesh mesh = mf.mesh;
+            Material mat = meshRenderer.sharedMaterial;
+            Mesh mesh = mf.sharedMesh;
 
             mat.SetFloat("_ClipEnd",0);
             mat.SetFloat("_Dissolve",dissolve);
@@ -186,7 +186,7 @@ public class SketchRevealEffect : MonoBehaviour
             if (hide)
             {
                 meshRenderer = mf.GetComponent<MeshRenderer>();
-                mat = meshRenderer.material;
+                mat = meshRenderer.sharedMaterial;
 
                 // make it visible
                 mat.SetFloat("_ClipEnd",0.1f);
@@ -198,7 +198,7 @@ public class SketchRevealEffect : MonoBehaviour
                 vertexBase += mf.sharedMesh.vertexCount;
 
                 meshRenderer = mf.GetComponent<MeshRenderer>();
-                mat = meshRenderer.material;
+                mat = meshRenderer.sharedMaterial;
 
                 // make it visible
                 mat.SetFloat("_ClipEnd",0);
@@ -214,7 +214,7 @@ public class SketchRevealEffect : MonoBehaviour
             int localVertexIndex = vertex - vertexBase + 1;
 
             meshRenderer = mf.GetComponent<MeshRenderer>();
-            mat = meshRenderer.material;
+            mat = meshRenderer.sharedMaterial;
 
             // make it visible
             mat.SetFloat("_ClipEnd",localVertexIndex);
