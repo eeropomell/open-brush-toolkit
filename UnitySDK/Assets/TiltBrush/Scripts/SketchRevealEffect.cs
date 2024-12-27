@@ -20,8 +20,6 @@ public class SketchRevealEffect : MonoBehaviour
     public float sketchStartTime = 0f;
     public float sketchEndTime = 0f;
 
-    [Range(0, 1)] public float dissolve;
-
     [Range(0,1)]
     public float t;
 
@@ -48,7 +46,6 @@ public class SketchRevealEffect : MonoBehaviour
             // this will hide the material at the beginning
             meshRenderer.sharedMaterial.SetFloat("_ClipEnd",.1f);
             meshRenderer.sharedMaterial.EnableKeyword("SHADER_SCRIPTING_ON");
-            meshRenderer.sharedMaterial.SetFloat("_Dissolve",dissolve);
 
             totalVertexCount += mf.sharedMesh.vertexCount;
 
@@ -149,7 +146,6 @@ public class SketchRevealEffect : MonoBehaviour
             Mesh mesh = mf.sharedMesh;
 
             mat.SetFloat("_ClipEnd",.1f);
-            mat.SetFloat("_Dissolve",dissolve);
         }
     }
 
@@ -166,7 +162,6 @@ public class SketchRevealEffect : MonoBehaviour
             Mesh mesh = mf.sharedMesh;
 
             mat.SetFloat("_ClipEnd",0);
-            mat.SetFloat("_Dissolve",dissolve);
         }
     }
 
@@ -190,7 +185,6 @@ public class SketchRevealEffect : MonoBehaviour
 
                 // make it visible
                 mat.SetFloat("_ClipEnd",0.1f);
-                mat.SetFloat("_Dissolve",dissolve);
                 continue;
             }
             if (mf.sharedMesh.vertexCount + vertexBase < vertex)
@@ -202,7 +196,6 @@ public class SketchRevealEffect : MonoBehaviour
 
                 // make it visible
                 mat.SetFloat("_ClipEnd",0);
-                mat.SetFloat("_Dissolve",dissolve);
 
                 continue;
             }
@@ -218,7 +211,6 @@ public class SketchRevealEffect : MonoBehaviour
 
             // make it visible
             mat.SetFloat("_ClipEnd",localVertexIndex);
-            mat.SetFloat("_Dissolve",dissolve);
 
             hide = true;
         }
