@@ -46,6 +46,7 @@ CGPROGRAM
 #pragma surface surf Lambert vertex:vert alphatest:_Cutoff addshadow
 #pragma multi_compile __ TBT_LINEAR_TARGET
 #pragma multi_compile __ SELECTION_ON
+#pragma multi_compile_local __ SHADER_SCRIPTING_ON
 #pragma target 4.0
 #include "../../../Shaders/Include/Brush.cginc"
 #include "../../../Shaders/Include/MobileSelection.cginc"

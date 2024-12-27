@@ -34,7 +34,6 @@ Shader "Brush/Disco" {
     _MainTex ("Base (RGB) TransGloss (A)", 2D) = "white" {}
     _BumpMap ("Normalmap", 2D) = "bump" {}
 
-
     _TimeOverrideValue("Time Override Value", Vector) = (0,0,0,0)
     _TimeBlend("Time Blend", Float) = 0
     _TimeSpeed("Time Speed", Float) = 1.0
@@ -52,6 +51,7 @@ Shader "Brush/Disco" {
     #pragma multi_compile __ AUDIO_REACTIVE
     #pragma multi_compile __ TBT_LINEAR_TARGET
     #pragma multi_compile __ SELECTION_ON
+    #pragma multi_compile_local __ SHADER_SCRIPTING_ON
 
     #include "../../../Shaders/Include/Brush.cginc"
 

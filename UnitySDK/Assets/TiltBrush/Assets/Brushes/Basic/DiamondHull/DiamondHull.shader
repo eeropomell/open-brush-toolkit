@@ -53,6 +53,7 @@ Shader "Brush/Special/DiamondHull" {
       #pragma multi_compile __ AUDIO_REACTIVE
       #pragma multi_compile __ TBT_LINEAR_TARGET
       #pragma multi_compile __ SELECTION_ON
+      #pragma multi_compile_local __ SHADER_SCRIPTING_ON
 
       #include "../../../Shaders/Include/Brush.cginc"
       #include "Assets/ThirdParty/Noise/Shaders/Noise.cginc"
