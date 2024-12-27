@@ -1,19 +1,14 @@
 {
     "name": "TiltBrushToolkitRuntime",
     "references": [
-        "TiltBrushToolkitThirdParty",
-        "Unity.Burst",
-        "Unity.Mathematics",
-        "Unity.Entities",
-        "Unity.Collections"
+        "TiltBrushToolkitThirdParty"
     ],
+    "optionalUnityReferences": [],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
-    "versionDefines": [],
-    "noEngineReferences": false
+    "defineConstraints": []
 }

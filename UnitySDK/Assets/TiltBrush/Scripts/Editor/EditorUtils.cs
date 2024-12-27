@@ -12,210 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
-using Unity.Jobs;
-using UnityEngine.Profiling;
-using Object = UnityEngine.Object;
 
 namespace TiltBrushToolkit {
 
 public class EditorUtils {
 
   #region Tilt Menu
-
-
-    private static async Task Mesh2Stroke(GameObject obj)
-  {
-    Profiler.BeginSample("Mesh2Stroke");
-    GameObject selectedObj = obj;
-    MeshFilter meshFilter = selectedObj.GetComponent<MeshFilter>();
-    if (meshFilter == null)
-    {
-      return;
-    }
-    Mesh mesh = meshFilter.sharedMesh;
-
-    var uv2 = new List<Vector3>();
-    mesh.GetUVs(2,uv2);
-
-    if (uv2.Count == 0)
-    {
-      Debug.LogError("No Timestamp data in the mesh");
-    }
-    else
-    {
-      var uv3 = new List<Vector3>();
-      mesh.GetUVs(3,uv3);
-      if (uv3.Count == 0)
-      {
-        Debug.LogError("No StrokeIDs in the mesh. Use Tools/AddStrokeIds to generate them");
-      }
-      else
-      {
-        // for each strokeID, we make a new GameObject.
-        // they are under the same parent that has suffix "(Separated")
-
-        GameObject emptyParentOfSeparatedStrokes = new GameObject(selectedObj.name + " (separated)");
-        emptyParentOfSeparatedStrokes.transform.position = selectedObj.transform.position;
-        emptyParentOfSeparatedStrokes.transform.rotation = selectedObj.transform.rotation;
-        emptyParentOfSeparatedStrokes.transform.SetParent(selectedObj.transform.parent);
-
-        Profiler.BeginSample("StrokeIDs.Add");
-        HashSet<float> strokeIDs = new HashSet<float>();
-
-        int totalVertexCount = 0;
-        List<int> vertexCounts = new List<int>();
-        for (int i = 0; ; i++)
-        {
-          // we store all possible strokeIDs in the uv3.y of the mesh
-          // AddStrokeIds.cs will set uv3.x (the strokeID of each vertex)
-          // at the same time, we can use uv3.y to store all possible strokeIDs
-          // otherwise we'd have to iterate all vertices here, so it'd be an O(n) operation where n is vertexCount
-          // todo: maybe implement a cleaner solution
-          if (uv3[i].y == 0)
-          {
-            break;
-          }
-
-          totalVertexCount += (int)uv3[i].z;
-          strokeIDs.Add(uv3[i].y);
-          vertexCounts.Add((int)uv3[i].z);
-        }
-        Profiler.EndSample();
-
-        /*
-         * We set up the new meshes triangles arrays using 2 jobs:
-         * 1. the first one will calculate the length of each mesh's triangle array
-         *    we do this because we use NativeArray for creating the triangles arrays in the 2nd job
-         *
-         * 2. the second job will actually do the copying of the triangles from the originalTriangles to the new mesh's triangles array
-         *    the new triangles arrays are stored in contiguous memory
-         *    e.g if we have 3 new meshes (ie 3 strokeIDs), then triangles = [trianglesForStrokeID0,trianglesForStrokeID2,trianglesForStrokeID3]
-         *    we do this because there are no 2d NativeArrays
-         *
-         *
-         */
-
-        // First pass
-        NativeArray<int> triangleCounts = new NativeArray<int>(strokeIDs.Count, Allocator.Persistent);
-        NativeArray<int> originalTriangles = new NativeArray<int>(mesh.triangles, Allocator.Persistent);
-        NativeArray<float> nativeStrokeIDs = new NativeArray<float>(strokeIDs.ToArray(), Allocator.Persistent);
-        NativeArray<Vector3> nativeUV3 = new NativeArray<Vector3>(uv3.ToArray(), Allocator.Persistent);
-
-        new CountTrianglesForStrokesJob()
-        {
-          uv3 = nativeUV3,
-          triangles = originalTriangles,
-          strokeIDs = nativeStrokeIDs,
-          triangleCounts = triangleCounts,
-        }.Schedule(strokeIDs.Count, 1).Complete();
-
-        NativeArray<int> vertexMap = new NativeArray<int>(mesh.vertexCount, Allocator.Persistent);
-
-        var job3 = new CreateVertexArraysJob()
-        {
-          vertexMap = vertexMap,
-          uv3 = nativeUV3,
-          strokeIDs = nativeStrokeIDs
-        }.Schedule(strokeIDs.Count,1);
-
-        job3.Complete();
-
-        // Second pass
-        NativeArray<int> triangles_ = new NativeArray<int>(mesh.triangles.Length, Allocator.Persistent);
-
-        new CollectTrianglesForStrokesJob()
-        {
-          uv3 = nativeUV3,
-          triangles = triangles_,
-          strokeIDs = nativeStrokeIDs,
-          triangleCounts = triangleCounts,
-          originalTriangles = originalTriangles,
-          vertexMap = vertexMap
-        }.Schedule(strokeIDs.Count, 1).Complete();
-
-        originalTriangles.Dispose();
-        nativeStrokeIDs.Dispose();
-        nativeUV3.Dispose();
-        vertexMap.Dispose();
-
-        int strokeIndex = 0;
-        foreach (float strokeID in strokeIDs)
-        {
-
-          GameObject newO = GameObject.Instantiate(selectedObj,selectedObj.transform.position, selectedObj.transform.rotation);
-          newO.transform.SetParent(emptyParentOfSeparatedStrokes.transform);
-          newO.name += $" ({strokeIndex})";
-
-          int triangleCount = triangleCounts[strokeIndex];
-          int startingIndex = 0;
-          int startingVertexIndex = 0;
-
-          for (int i = 0; i < strokeIndex; i++)
-          {
-            startingIndex += (triangleCounts[i]);
-            startingVertexIndex += (vertexCounts[i]);
-          }
-
-          unsafe
-          {
-            // this could definitely be written in a simpler way but this version (of the entire tool)
-            // is still a prototype, so there's no point in improving this part of the code yet.
-       /*     int* p = (int*)triangles_.GetUnsafePtr();
-            NativeArray<int> castedTris = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<int>(p + startingIndex, triangleCount, Allocator.None);
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref castedTris, AtomicSafetyHandle.GetTempUnsafePtrSliceHandle());
-#endif
-
-            int[] triangles = castedTris.ToArray();*/
-            int[] triangles = new int[triangleCount];
-
-            int vertexCount = (int)uv3[strokeIndex].z;
-            Vector3[] vertices = new Vector3[vertexCount];
-            Vector2[] uv = new Vector2[vertexCount];
-            Vector3[] normals = new Vector3[vertexCount];
-            Color[] colors = new Color[vertexCount];
-
-            NativeArray<int>.Copy(triangles_, startingIndex, triangles, 0, triangleCount);
-            Array.Copy(mesh.vertices, startingVertexIndex, vertices, 0, vertexCount);
-            Array.Copy(mesh.uv, startingVertexIndex, uv, 0, vertexCount);
-            Array.Copy(mesh.normals, startingVertexIndex, normals, 0, vertexCount);
-            Array.Copy(mesh.colors, startingVertexIndex, colors, 0, vertexCount);
-
-            var newMesh_ = GetMeshSubset(mesh,triangles,vertices, uv, normals, colors);
-            newO.GetComponent<MeshFilter>().mesh = newMesh_;
-            strokeIndex++;
-          }
-
-
-        }
-
-        triangles_.Dispose();
-        triangleCounts.Dispose();
-
-      }
-    }
-    Profiler.EndSample();
-  }
-
-  // split a mesh into strokes using timestamps
-  [MenuItem("Tilt Brush/Labs/Mesh To Strokes")]
-  public static async void Mesh2Strokes()
-  {
-    GameObject[] selected = Selection.gameObjects;
-    foreach (var obj in selected)
-    {
-      Mesh2Stroke(obj);
-    }
-  }
 
   [MenuItem("Tilt Brush/Labs/Separate strokes by brush color")]
   public static void ExplodeSketchByColor() {
@@ -332,18 +138,17 @@ public class EditorUtils {
     return v;
   }
 
-  public static Mesh GetMeshSubset(Mesh OriginalMesh, int[] Triangles, Vector3[] vertices = null, Vector2[] uv = null, Vector3[] normals = null,
-    Color[] colors = null) {
+  public static Mesh GetMeshSubset(Mesh OriginalMesh, int[] Triangles) {
     Mesh newMesh = new Mesh();
     newMesh.name = OriginalMesh.name;
-    newMesh.vertices = vertices ?? OriginalMesh.vertices;
+    newMesh.vertices = OriginalMesh.vertices;
     newMesh.triangles = Triangles;
-    newMesh.uv = uv ?? OriginalMesh.uv;
-    //newMesh.uv2 = OriginalMesh.uv2; <-- not needed for now
-   // newMesh.uv3 = OriginalMesh.uv3;
-    newMesh.colors = colors ?? OriginalMesh.colors;
+    newMesh.uv = OriginalMesh.uv;
+    newMesh.uv2 = OriginalMesh.uv2;
+    newMesh.uv2 = OriginalMesh.uv2;
+    newMesh.colors = OriginalMesh.colors;
     newMesh.subMeshCount = OriginalMesh.subMeshCount;
-    newMesh.normals = normals ?? OriginalMesh.normals;
+    newMesh.normals = OriginalMesh.normals;
     //AssetDatabase.CreateAsset(newMesh, "Assets/"+mesh.name+"_submesh["+index+"].asset");
     return newMesh;
   }
