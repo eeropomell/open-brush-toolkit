@@ -9,15 +9,15 @@ using UnityEngine.Assertions;
 public class SketchRevealEffect : MonoBehaviour
 {
 
+    private float totalVertexCount = 0;
     [SerializeField]
     private List<MeshFilter> allStrokes;
 
+    private float sketchStartTime = 0f;
+    private float sketchEndTime = 0f;
 
-    public float totalVertexCount = 0;
     public float totalSketchTime = 0f;
 
-    public float sketchStartTime = 0f;
-    public float sketchEndTime = 0f;
 
     private float prevT;
     [Range(0,1)]
