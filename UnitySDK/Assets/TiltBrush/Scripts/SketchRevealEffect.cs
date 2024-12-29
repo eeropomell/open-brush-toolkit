@@ -20,6 +20,7 @@ public class SketchRevealEffect : MonoBehaviour
     public float sketchStartTime = 0f;
     public float sketchEndTime = 0f;
 
+    private float prevT;
     [Range(0,1)]
     public float t;
 
@@ -65,6 +66,7 @@ public class SketchRevealEffect : MonoBehaviour
         sketchStartTime = GetSketchFirstTimestamp(allStrokes.ToArray());
         sketchEndTime = GetSketchLastTimestamp(allStrokes.ToArray());
 
+        prevT = -1f;
         strokesAreReady = true;
         currentStrokeIndex = 0;
     }
@@ -224,6 +226,11 @@ public class SketchRevealEffect : MonoBehaviour
         // if we're in Edit mode, use t in [0,1] to drive the playback
         if (!Application.IsPlaying(gameObject))
         {
+            if (AreFloatsEqual(t, prevT))
+            {
+                return;
+            }
+            prevT = t;
             // if t == 0, hide all
             // if t == 1, show all
             int vertex = (int)(t * totalVertexCount);
@@ -246,8 +253,6 @@ public class SketchRevealEffect : MonoBehaviour
 
     }
 }
-
-
 
 
 
