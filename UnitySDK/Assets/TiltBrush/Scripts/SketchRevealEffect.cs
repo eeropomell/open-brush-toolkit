@@ -58,6 +58,11 @@ public class SketchRevealEffect : MonoBehaviour
         prevT = -1f;
     }
 
+    public float CalculateTotalSketchTime()
+    {
+        return (GetSketchLastTimestamp(allStrokes.ToArray()) - GetSketchFirstTimestamp(allStrokes.ToArray())) / 1000;
+    }
+
     private float GetSketchFirstTimestamp(MeshFilter[] allStrokes_)
     {
         Mesh mesh = allStrokes_[0].sharedMesh;
