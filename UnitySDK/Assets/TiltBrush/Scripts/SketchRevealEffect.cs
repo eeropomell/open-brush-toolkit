@@ -23,9 +23,12 @@ public class SketchRevealEffect : MonoBehaviour
     [Range(0,1)]
     public float t;
 
+    private static readonly int PropertyIdClipEnd = Shader.PropertyToID("_ClipEnd");
+    private static readonly int PropertyIdClipStart = Shader.PropertyToID("_ClipStart");
 
     void Awake()
     {
+
         allStrokes = new List<MeshFilter>();
         List<MeshFilter> allMeshFilters = GetComponentsInChildren<MeshFilter>().ToList();
         totalVertexCount = 0;
@@ -39,7 +42,7 @@ public class SketchRevealEffect : MonoBehaviour
             meshRenderer.material = new Material(mat_);
 
             // this will hide the material at the beginning
-            meshRenderer.sharedMaterial.SetFloat("_ClipEnd",.1f);
+            meshRenderer.sharedMaterial.SetFloat(PropertyIdClipEnd,.1f);
             meshRenderer.sharedMaterial.EnableKeyword("SHADER_SCRIPTING_ON");
 
             totalVertexCount += mf.sharedMesh.vertexCount;
@@ -140,7 +143,7 @@ public class SketchRevealEffect : MonoBehaviour
                 Material mat = meshRenderer.sharedMaterial;
                 Mesh mesh = mf.sharedMesh;
 
-                mat.SetFloat("_ClipEnd", .1f);
+                mat.SetFloat(PropertyIdClipEnd, .1f);
             }
             catch (MissingReferenceException exception)
             {
@@ -167,7 +170,7 @@ public class SketchRevealEffect : MonoBehaviour
                 Material mat = meshRenderer.sharedMaterial;
                 Mesh mesh = mf.sharedMesh;
 
-                mat.SetFloat("_ClipEnd", 0);
+                mat.SetFloat(PropertyIdClipEnd, 0);
             }
             catch (MissingReferenceException exception)
             {
@@ -202,7 +205,7 @@ public class SketchRevealEffect : MonoBehaviour
                     mat = meshRenderer.sharedMaterial;
 
                     // make it visible
-                    mat.SetFloat("_ClipEnd", 0.1f);
+                    mat.SetFloat(PropertyIdClipEnd, 0.1f);
                     continue;
                 }
 
@@ -214,7 +217,7 @@ public class SketchRevealEffect : MonoBehaviour
                     mat = meshRenderer.sharedMaterial;
 
                     // make it visible
-                    mat.SetFloat("_ClipEnd", 0);
+                    mat.SetFloat(PropertyIdClipEnd, 0);
 
                     continue;
                 }
@@ -229,7 +232,7 @@ public class SketchRevealEffect : MonoBehaviour
                 mat = meshRenderer.sharedMaterial;
 
                 // make it visible
-                mat.SetFloat("_ClipEnd", localVertexIndex);
+                mat.SetFloat(PropertyIdClipEnd, localVertexIndex);
 
                 hide = true;
             }
