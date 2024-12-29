@@ -12,7 +12,6 @@ public class SketchRevealEffect : MonoBehaviour
     [SerializeField]
     private List<MeshFilter> allStrokes;
 
-    private bool strokesAreReady = false;
 
     public float totalVertexCount = 0;
     public float totalSketchTime = 0f;
@@ -24,10 +23,6 @@ public class SketchRevealEffect : MonoBehaviour
     [Range(0,1)]
     public float t;
 
-    // this is the current clipEnd of the stroke we're animating
-    // clipEnd is reset to 0 everytime a stroke has been fully revealed
-    private float clipEnd = 0;
-    public int currentStrokeIndex = 0;
 
     // Start is called before the first frame update
     void Start()
@@ -55,20 +50,12 @@ public class SketchRevealEffect : MonoBehaviour
 
         OrderStrokes();
 
-        foreach (MeshFilter mf in allStrokes)
-        {
-            Mesh m = mf.sharedMesh;
-            Vector2 timestamp = new Vector2(m.uv2[0].x,m.uv2[0].y);
-            Debug.Log($"stroke: {timestamp.x},{timestamp.y}");
-        }
 
         totalSketchTime = GetSketchLastTimestamp(allStrokes.ToArray()) - GetSketchFirstTimestamp(allStrokes.ToArray());
         sketchStartTime = GetSketchFirstTimestamp(allStrokes.ToArray());
         sketchEndTime = GetSketchLastTimestamp(allStrokes.ToArray());
 
         prevT = -1f;
-        strokesAreReady = true;
-        currentStrokeIndex = 0;
     }
 
     private float GetSketchFirstTimestamp(MeshFilter[] allStrokes_)
