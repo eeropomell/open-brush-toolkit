@@ -129,13 +129,24 @@ public class SketchRevealEffect : MonoBehaviour
 
         for (int i = 0; i < allStrokes_.Length; i++)
         {
+            try
+            {
+                mf = allStrokes_[i];
+                MeshRenderer meshRenderer = mf.GetComponent<MeshRenderer>();
+                Material mat = meshRenderer.sharedMaterial;
+                Mesh mesh = mf.sharedMesh;
 
-            mf = allStrokes_[i];
-            MeshRenderer meshRenderer = mf.GetComponent<MeshRenderer>();
-            Material mat = meshRenderer.sharedMaterial;
-            Mesh mesh = mf.sharedMesh;
-
-            mat.SetFloat("_ClipEnd",.1f);
+                mat.SetFloat("_ClipEnd", .1f);
+            }
+            catch (MissingReferenceException exception)
+            {
+                ; // this exception is caused if the mesh is deleted
+                // it's expected to happen and doesn't need to be logged
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"{exception}");
+            }
         }
     }
 
@@ -145,13 +156,24 @@ public class SketchRevealEffect : MonoBehaviour
 
         for (int i = 0; i < allStrokes_.Length; i++)
         {
+            try
+            {
+                mf = allStrokes_[i];
+                MeshRenderer meshRenderer = mf.GetComponent<MeshRenderer>();
+                Material mat = meshRenderer.sharedMaterial;
+                Mesh mesh = mf.sharedMesh;
 
-            mf = allStrokes_[i];
-            MeshRenderer meshRenderer = mf.GetComponent<MeshRenderer>();
-            Material mat = meshRenderer.sharedMaterial;
-            Mesh mesh = mf.sharedMesh;
-
-            mat.SetFloat("_ClipEnd",0);
+                mat.SetFloat("_ClipEnd", 0);
+            }
+            catch (MissingReferenceException exception)
+            {
+                ; // this exception is caused if the mesh is deleted
+                // it's expected to happen and doesn't need to be logged
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"{exception}");
+            }
         }
     }
 
@@ -167,42 +189,55 @@ public class SketchRevealEffect : MonoBehaviour
         // make each of the strokes on the journey visible
         for (int i = 0; i < allStrokes_.Length; i++)
         {
-            mf = allStrokes[i];
-            if (hide)
+            try
             {
+                mf = allStrokes_[i];
+                if (hide)
+                {
+                    meshRenderer = mf.GetComponent<MeshRenderer>();
+                    mat = meshRenderer.sharedMaterial;
+
+                    // make it visible
+                    mat.SetFloat("_ClipEnd", 0.1f);
+                    continue;
+                }
+
+                if (mf.sharedMesh.vertexCount + vertexBase < vertex)
+                {
+                    vertexBase += mf.sharedMesh.vertexCount;
+
+                    meshRenderer = mf.GetComponent<MeshRenderer>();
+                    mat = meshRenderer.sharedMaterial;
+
+                    // make it visible
+                    mat.SetFloat("_ClipEnd", 0);
+
+                    continue;
+                }
+
+                // do it once, and return
+
+                // we've already shown 'vertexBase' amount vertices
+                // for this stroke, we show the first 'vertex - vertexBase + 1' vertices
+                int localVertexIndex = vertex - vertexBase + 1;
+
                 meshRenderer = mf.GetComponent<MeshRenderer>();
                 mat = meshRenderer.sharedMaterial;
 
                 // make it visible
-                mat.SetFloat("_ClipEnd",0.1f);
-                continue;
+                mat.SetFloat("_ClipEnd", localVertexIndex);
+
+                hide = true;
             }
-            if (mf.sharedMesh.vertexCount + vertexBase < vertex)
+            catch (MissingReferenceException exception)
             {
-                vertexBase += mf.sharedMesh.vertexCount;
-
-                meshRenderer = mf.GetComponent<MeshRenderer>();
-                mat = meshRenderer.sharedMaterial;
-
-                // make it visible
-                mat.SetFloat("_ClipEnd",0);
-
-                continue;
+                ; // this exception is caused if the mesh is deleted
+                // it's expected to happen and doesn't need to be logged
             }
-
-            // do it once, and return
-
-            // we've already shown 'vertexBase' amount vertices
-            // for this stroke, we show the first 'vertex - vertexBase + 1' vertices
-            int localVertexIndex = vertex - vertexBase + 1;
-
-            meshRenderer = mf.GetComponent<MeshRenderer>();
-            mat = meshRenderer.sharedMaterial;
-
-            // make it visible
-            mat.SetFloat("_ClipEnd",localVertexIndex);
-
-            hide = true;
+            catch (Exception exception)
+            {
+                Debug.LogError($"{exception}");
+            }
         }
     }
 
@@ -240,7 +275,6 @@ public class SketchRevealEffect : MonoBehaviour
 
     }
 }
-
 
 
 
