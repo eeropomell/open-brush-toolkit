@@ -50,8 +50,7 @@ public class SketchRevealEffect : MonoBehaviour
 
         OrderStrokes();
 
-
-        totalSketchTime = GetSketchLastTimestamp(allStrokes.ToArray()) - GetSketchFirstTimestamp(allStrokes.ToArray());
+        totalSketchTime = (GetSketchLastTimestamp(allStrokes.ToArray()) - GetSketchFirstTimestamp(allStrokes.ToArray())) / 1000;
         sketchStartTime = GetSketchFirstTimestamp(allStrokes.ToArray());
         sketchEndTime = GetSketchLastTimestamp(allStrokes.ToArray());
 
