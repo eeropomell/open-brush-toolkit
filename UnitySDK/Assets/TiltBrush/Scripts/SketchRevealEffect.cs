@@ -61,13 +61,13 @@ public class SketchRevealEffect : MonoBehaviour
     private float GetSketchFirstTimestamp(MeshFilter[] allStrokes_)
     {
         Mesh mesh = allStrokes_[0].sharedMesh;
-        return mesh.uv2[0].x;
+        return mesh.uv3[0].x;
     }
 
     private float GetSketchLastTimestamp(MeshFilter[] allStrokes_)
     {
         Mesh mesh = allStrokes_[allStrokes_.Length - 1].sharedMesh;
-        return mesh.uv2[0].y;
+        return mesh.uv3[0].y;
     }
 
     private float GetStrokeID(MeshFilter stroke)
