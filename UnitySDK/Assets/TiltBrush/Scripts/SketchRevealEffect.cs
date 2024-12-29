@@ -24,8 +24,7 @@ public class SketchRevealEffect : MonoBehaviour
     public float t;
 
 
-    // Start is called before the first frame update
-    void Start()
+    void Awake()
     {
         allStrokes = new List<MeshFilter>();
         List<MeshFilter> allMeshFilters = GetComponentsInChildren<MeshFilter>().ToList();
@@ -56,6 +55,7 @@ public class SketchRevealEffect : MonoBehaviour
 
         prevT = -1f;
     }
+
 
     public float CalculateTotalSketchTime()
     {
@@ -123,7 +123,7 @@ public class SketchRevealEffect : MonoBehaviour
 
     public void UpdateStrokesArray()
     {
-        Start();
+        Awake();
     }
 
 
