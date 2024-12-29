@@ -121,10 +121,11 @@ public class SketchRevealEffect : MonoBehaviour
             }
         });
 
-        bool AreFloatsEqual(float a, float b, float epsilon = 0.00001f)
-        {
-            return Mathf.Abs(a - b) < epsilon;
-        }
+    }
+
+    private static bool AreFloatsEqual(float a, float b, float epsilon = 0.00001f)
+    {
+        return Mathf.Abs(a - b) < epsilon;
     }
 
     public void UpdateStrokesArray()
