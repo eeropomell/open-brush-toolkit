@@ -18,7 +18,6 @@ public class SketchRevealEffect : MonoBehaviour
 
     public float totalSketchTime = 0f;
 
-
     private float prevT;
     [Range(0,1)]
     public float t;
@@ -55,9 +54,9 @@ public class SketchRevealEffect : MonoBehaviour
 
         OrderStrokes();
 
-        totalSketchTime = (GetSketchLastTimestamp(allStrokes.ToArray()) - GetSketchFirstTimestamp(allStrokes.ToArray())) / 1000;
-        sketchStartTime = GetSketchFirstTimestamp(allStrokes.ToArray());
-        sketchEndTime = GetSketchLastTimestamp(allStrokes.ToArray());
+        totalSketchTime = (GetSketchLastTimestamp() - GetSketchFirstTimestamp()) / 1000;
+        sketchStartTime = GetSketchFirstTimestamp();
+        sketchEndTime = GetSketchLastTimestamp();
 
         prevT = -1f;
     }
@@ -65,18 +64,28 @@ public class SketchRevealEffect : MonoBehaviour
 
     public float CalculateTotalSketchTime()
     {
-        return (GetSketchLastTimestamp(allStrokes.ToArray()) - GetSketchFirstTimestamp(allStrokes.ToArray())) / 1000;
+        return (GetSketchLastTimestamp() - GetSketchFirstTimestamp()) / 1000;
     }
 
-    private float GetSketchFirstTimestamp(MeshFilter[] allStrokes_)
+    private float GetSketchFirstTimestamp()
     {
-        Mesh mesh = allStrokes_[0].sharedMesh;
+        if (allStrokes.Count < 1)
+        {
+            Debug.LogError("allStrokes is empty");
+            return 0f;
+        }
+        Mesh mesh = allStrokes[0].sharedMesh;
         return mesh.uv3[0].x;
     }
 
-    private float GetSketchLastTimestamp(MeshFilter[] allStrokes_)
+    private float GetSketchLastTimestamp()
     {
-        Mesh mesh = allStrokes_[allStrokes_.Length - 1].sharedMesh;
+        if (allStrokes.Count < 1)
+        {
+            Debug.LogError("allStrokes is empty");
+            return 0f;
+        }
+        Mesh mesh = allStrokes[allStrokes.Count - 1].sharedMesh;
         return mesh.uv3[0].y;
     }
 
@@ -133,15 +142,15 @@ public class SketchRevealEffect : MonoBehaviour
     }
 
 
-    private void HideAllStrokes(MeshFilter[] allStrokes_)
+    private void HideAllStrokes()
     {
         MeshFilter mf = new MeshFilter();
 
-        for (int i = 0; i < allStrokes_.Length; i++)
+        for (int i = 0; i < allStrokes.Count; i++)
         {
             try
             {
-                mf = allStrokes_[i];
+                mf = allStrokes[i];
                 MeshRenderer meshRenderer = mf.GetComponent<MeshRenderer>();
                 Material mat = meshRenderer.sharedMaterial;
                 Mesh mesh = mf.sharedMesh;
@@ -160,15 +169,15 @@ public class SketchRevealEffect : MonoBehaviour
         }
     }
 
-    private void ShowAllStrokes(MeshFilter[] allStrokes_)
+    private void ShowAllStrokes()
     {
         MeshFilter mf = new MeshFilter();
 
-        for (int i = 0; i < allStrokes_.Length; i++)
+        for (int i = 0; i < allStrokes.Count; i++)
         {
             try
             {
-                mf = allStrokes_[i];
+                mf = allStrokes[i];
                 MeshRenderer meshRenderer = mf.GetComponent<MeshRenderer>();
                 Material mat = meshRenderer.sharedMaterial;
                 Mesh mesh = mf.sharedMesh;
@@ -188,7 +197,7 @@ public class SketchRevealEffect : MonoBehaviour
     }
 
 
-    private void ShowVerticesUpTo(MeshFilter[] allStrokes_, int vertex)
+    private void ShowVerticesUpTo(int vertex)
     {
         int vertexBase = 0;
         MeshFilter mf = new MeshFilter();
@@ -197,11 +206,11 @@ public class SketchRevealEffect : MonoBehaviour
         bool hide = false;
         // we iterate the strokes, until we reach 'vertex'
         // make each of the strokes on the journey visible
-        for (int i = 0; i < allStrokes_.Length; i++)
+        for (int i = 0; i < allStrokes.Count; i++)
         {
             try
             {
-                mf = allStrokes_[i];
+                mf = allStrokes[i];
                 if (hide)
                 {
                     meshRenderer = mf.GetComponent<MeshRenderer>();
@@ -269,14 +278,14 @@ public class SketchRevealEffect : MonoBehaviour
 
             if (vertex == 0)
             {
-                HideAllStrokes(allStrokes.ToArray());
+                HideAllStrokes();
             } else if (t == 1.0)
             {
-                ShowAllStrokes(allStrokes.ToArray());
+                ShowAllStrokes();
             }
             else
             {
-                ShowVerticesUpTo(allStrokes.ToArray(),vertex);
+                ShowVerticesUpTo(vertex);
             }
 
         }
