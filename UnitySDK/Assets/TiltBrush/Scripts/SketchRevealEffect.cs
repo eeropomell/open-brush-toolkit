@@ -26,6 +26,9 @@ public class SketchRevealEffect : MonoBehaviour
     private static readonly int PropertyIdClipEnd = Shader.PropertyToID("_ClipEnd");
     private static readonly int PropertyIdClipStart = Shader.PropertyToID("_ClipStart");
 
+    // setting _ClipEnd to this value makes the brush fragment shader discard all vertices
+    private const float CLIPEND_HIDE_ALL_VALUE = .0001f;
+
     void Awake()
     {
 
@@ -42,7 +45,7 @@ public class SketchRevealEffect : MonoBehaviour
             meshRenderer.material = new Material(mat_);
 
             // this will hide the material at the beginning
-            meshRenderer.sharedMaterial.SetFloat(PropertyIdClipEnd,.1f);
+            meshRenderer.sharedMaterial.SetFloat(PropertyIdClipEnd,CLIPEND_HIDE_ALL_VALUE);
             meshRenderer.sharedMaterial.EnableKeyword("SHADER_SCRIPTING_ON");
 
             totalVertexCount += mf.sharedMesh.vertexCount;
