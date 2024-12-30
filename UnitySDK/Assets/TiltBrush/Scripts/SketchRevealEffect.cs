@@ -18,6 +18,8 @@ public class SketchRevealEffect : MonoBehaviour
 
     public float totalSketchTime = 0f;
 
+    private bool isFirstFrame = true;
+
     private float prevT;
     [Range(0,1)]
     public float t;
@@ -264,10 +266,16 @@ public class SketchRevealEffect : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
+        if (isFirstFrame)
+        {
+            isFirstFrame = false;
+        }
+
         // if we're in Edit mode, use t in [0,1] to drive the playback
         if (!Application.IsPlaying(gameObject))
         {
-            if (AreFloatsEqual(t, prevT))
+            if (!isFirstFrame && AreFloatsEqual(t, prevT))
             {
                 return;
             }
