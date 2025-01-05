@@ -11,9 +11,9 @@ public class SketchRevealEffectUtils : Editor
     {
         DrawDefaultInspector();
 
-        SketchRevealEffect sketchRevealEffect = (SketchRevealEffect)target;
+        SketchRevealEffect sketchRevealEffectBase = (SketchRevealEffect)target;
 
-        if (sketchRevealEffect == null)
+        if (sketchRevealEffectBase == null)
         {
             return;
         }
@@ -21,7 +21,7 @@ public class SketchRevealEffectUtils : Editor
         // calculates the real sketch time of the sketch, and sets TotalSketchTime to that value
         if (GUILayout.Button("Get Actual Sketch Time"))
         {
-            sketchRevealEffect.totalSketchTime = sketchRevealEffect.CalculateTotalSketchTime();
+            sketchRevealEffectBase.totalSketchTime = sketchRevealEffectBase.CalculateTotalSketchTime();
         }
     }
 
